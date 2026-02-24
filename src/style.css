@@ -1,0 +1,101 @@
+/* ===================== CSS 变量 / 主题色 ===================== */
+:root {
+  --primary: #3b82f6;
+  --primary-dark: #1e3a8a;
+  --sidebar-bg: #1e2d5e;
+  --bg-page: #f0f2f5;
+  --border-radius-card: 12px;
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* ===================== 全局重置 ===================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-size: 14px;
+  color: #333;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  height: 100%;
+}
+
+/* ===================== 滚动条美化 ===================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #c8cdd6;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a8adb7;
+}
+
+/* ===================== Element Plus 全局覆盖 ===================== */
+/* 卡片圆角统一 */
+.el-card {
+  border-radius: var(--border-radius-card) !important;
+}
+
+/* 按钮统一圆角 */
+.el-button {
+  border-radius: 8px !important;
+}
+
+/* 弹框圆角 */
+.el-dialog {
+  border-radius: 16px !important;
+}
+
+/* 表格 header 背景 */
+.el-table th.el-table__cell {
+  background-color: #f8f9fc !important;
+  color: #555 !important;
+  font-weight: 600;
+}
+
+/* ===================== 通用工具类 ===================== */
+.flex { display: flex; }
+.flex-center { display: flex; align-items: center; justify-content: center; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.gap-8 { gap: 8px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+.text-secondary { color: var(--el-text-color-secondary); }
+.text-primary { color: var(--primary); }
+.font-bold { font-weight: 700; }
+.mt-16 { margin-top: 16px; }
+.mb-16 { margin-bottom: 16px; }
+
+/* ===================== 页面容器（供各页面复用） ===================== */
+.page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--el-text-color-primary);
+}
+
+.section-card {
+  border-radius: var(--border-radius-card) !important;
+}

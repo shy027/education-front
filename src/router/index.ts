@@ -87,6 +87,18 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/resource/ResourcePage.vue'),
         meta: { title: '资源库', icon: 'FolderOpened' },
       },
+      {
+        path: 'resource/create',
+        name: 'ResourceCreate',
+        component: () => import('@/views/resource/ResourceCreatePage.vue'),
+        meta: { title: '发布资源', hideInMenu: true },
+      },
+      {
+        path: 'resource/:id',
+        name: 'ResourceDetail',
+        component: () => import('@/views/resource/ResourceDetailPage.vue'),
+        meta: { title: '资源详情', hideInMenu: true },
+      },
 
       // 报告画像
       {

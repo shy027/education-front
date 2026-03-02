@@ -1,10 +1,28 @@
-/* ===================== CSS 变量 / 主题色 ===================== */
+/* ===================== CSS 变量 / 主题色（红色系）===================== */
 :root {
-  --primary: #3b82f6;
-  --primary-dark: #1e3a8a;
-  --sidebar-bg: #1e2d5e;
+  /* 主色 */
+  --primary: #d32f2f;
+  --primary-light: #ff5252;
+  --primary-dark: #b71c1c;
+  --primary-pale: #ffebee;
+  --primary-hover: #fbe9e7;
+
+  /* 侧边栏 */
+  --sidebar-bg-from: #b71c1c;
+  --sidebar-bg-to: #d32f2f;
+
+  /* 页面背景 */
   --bg-page: #f0f2f5;
   --border-radius-card: 12px;
+
+  /* Element Plus 主色覆盖 */
+  --el-color-primary: #d32f2f;
+  --el-color-primary-light-3: #e57373;
+  --el-color-primary-light-5: #ef9a9a;
+  --el-color-primary-light-7: #ffcdd2;
+  --el-color-primary-light-9: #ffebee;
+  --el-color-primary-dark-2: #b71c1c;
+
   font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 

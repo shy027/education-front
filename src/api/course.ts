@@ -1,69 +1,244 @@
-import { get, post, put, del } from '@/utils/request'
+/**
+ * 课程服务 API
+ * 后端路由前缀：/api/v1
+ */
+import { get, post, put, del, upload } from '@/utils/request'
 import type { PageQuery, PageResponse } from '@/types/api'
 
-/** 课程列表查询参数 */
+// ===================== 类型定义 =====================
+
+export interface CourseCreateReq {
+  courseName: string
+  description?: string
+  cover?: string
+  subjectArea?: string
+  joinType: number        // 0=公开 1=审批 2=邀请码
+  inviteCode?: string
+  schoolId?: string
+}
+
+export interface CourseItem {
+  id: string
+  courseName: string
+  description: string
+  cover: string
+  status: number          // 0=草稿 1=发布 2=归档
+  joinType: number
+  teacherId: string
+  teacherName: string
+  memberCount: number
+  subjectArea: string
+  auditStatus: number
+  createdTime: string
+}
+
 export interface CourseQuery extends PageQuery {
   keyword?: string
-  status?: string
-  accessType?: string
   schoolId?: string
-  categoryId?: string
+  subjectArea?: string
+  joinType?: number
+  status?: number
+  auditStatus?: number
+  teacherId?: string
 }
 
-/** 课程简要信息 */
-export interface CourseBrief {
-  courseId: string
+export interface MyCoursesResponse {
+  teachingCourses: CourseItem[]
+  joinedCourses: CourseItem[]
+}
+
+export interface ChapterNode {
+  id: string
   title: string
-  description: string
-  coverImage: string
-  teacherName: string
-  schoolName: string
-  status: string
-  accessType: string
-  memberCount: number
-  createdAt: string
+  sortOrder: number
+  children: ChapterNode[]
 }
 
-/** 获取课程列表（学生/公开） */
+export interface CoursewareItem {
+  id: string
+  title: string
+  wareType: number        // 1=视频 2=文档 3=PPT 4=音频
+  fileUrl: string
+  coverUrl?: string
+  chapterId?: string
+  duration?: number
+  sortOrder: number
+  auditStatus: number
+  progress?: number       // 学习进度（百分比）
+}
+
+export interface TaskItem {
+  id: string
+  taskName: string
+  taskType: number        // 1=作业 2=考试 3=讨论
+  description?: string
+  startTime?: string
+  endTime?: string
+  totalScore?: number
+  duration?: number
+  status: number          // 0=草稿 1=发布 2=结束
+  submitCount: number
+}
+
+export interface AnnouncementItem {
+  id: string
+  title: string
+  content: string
+  isTop: number
+  createdTime: string
+  updatedTime: string
+}
+
+export interface MemberItem {
+  userId: string
+  username: string
+  realName: string
+  avatar?: string
+  memberRole: number      // 1=教师 2=助教 3=学生
+  joinStatus: number      // 0=待审批 1=已通过 2=已拒绝
+  joinedTime: string
+}
+
+export interface FileUploadResult {
+  fileUrl: string
+  fileSize?: number
+  duration?: number
+}
+
+// ===================== 课程 CRUD =====================
+
 export const getCourseList = (params: CourseQuery) =>
-  get<PageResponse<CourseBrief>>('/v1/courses', params)
+  get<PageResponse<CourseItem>>('/v1/courses', params)
 
-/** 获取课程详情 */
-export const getCourseDetail = (courseId: string) =>
-  get<Record<string, unknown>>(`/v1/courses/${courseId}`)
+export const getCourseDetail = (id: string) =>
+  get<CourseItem>(`/v1/courses/${id}`)
 
-/** 加入课程 */
+export const createCourse = (data: CourseCreateReq) =>
+  post<string>('/v1/courses', data)
+
+export const updateCourse = (data: CourseCreateReq & { id: string }) =>
+  put<void>('/v1/courses', data)
+
+export const updateCourseStatus = (id: string, status: number) =>
+  put<void>(`/v1/courses/${id}/status`, null, { params: { status } })
+
+export const getMyCourses = () =>
+  get<MyCoursesResponse>('/v1/courses/my-courses')
+
+// ===================== 章节 =====================
+
+export const getChapterTree = (courseId: string) =>
+  get<ChapterNode[]>(`/v1/courses/${courseId}/chapters/tree`)
+
+export const createChapter = (courseId: string, data: { title: string; parentId?: string; sortOrder?: number }) =>
+  post<string>(`/v1/courses/${courseId}/chapters`, data)
+
+export const deleteChapter = (courseId: string, id: string) =>
+  del<void>(`/v1/courses/${courseId}/chapters/${id}`)
+
+// ===================== 课件 =====================
+
+export const getCoursewareList = (courseId: string, params?: PageQuery & { chapterId?: string; wareType?: number }) =>
+  get<PageResponse<CoursewareItem>>(`/v1/courses/${courseId}/coursewares`, params)
+
+export const getCoursewareDetail = (wareId: string) =>
+  get<CoursewareItem>(`/v1/coursewares/${wareId}`)
+
+export const createCourseware = (courseId: string, data: Record<string, unknown>) =>
+  post<string>(`/v1/courses/${courseId}/coursewares`, data)
+
+export const deleteCourseware = (wareId: string) =>
+  del<void>(`/v1/coursewares/${wareId}`)
+
+/** 记录学习进度 */
+export const recordProgress = (wareId: string, data: { watchedDuration: number; totalDuration: number; isFinished?: boolean }) =>
+  post<void>(`/v1/coursewares/${wareId}/progress`, data)
+
+/** 上传课件文件 */
+export const uploadCoursewareFile = (type: 'video' | 'pdf' | 'audio' | 'ppt' | 'cover', file: File) => {
+  const form = new FormData()
+  form.append('file', file)
+  return upload<FileUploadResult>(`/v1/courseware/files/${type}`, form)
+}
+
+// ===================== 任务 =====================
+
+export const getTaskList = (courseId: string, params?: PageQuery) =>
+  get<PageResponse<TaskItem>>(`/v1/courses/${courseId}/tasks`, params)
+
+export const getTaskDetail = (courseId: string, id: string) =>
+  get<TaskItem>(`/v1/courses/${courseId}/tasks/${id}`)
+
+export const createTask = (courseId: string, data: Partial<TaskItem>) =>
+  post<string>(`/v1/courses/${courseId}/tasks`, data)
+
+export const updateTask = (courseId: string, data: Partial<TaskItem> & { id: string }) =>
+  put<void>(`/v1/courses/${courseId}/tasks`, data)
+
+export const deleteTask = (courseId: string, id: string) =>
+  del<void>(`/v1/courses/${courseId}/tasks/${id}`)
+
+export const updateTaskStatus = (courseId: string, id: string, status: number) =>
+  put<void>(`/v1/courses/${courseId}/tasks/${id}/status`, null, { params: { status } })
+
+// ===================== 成员 =====================
+
+export const getMemberList = (courseId: string, params?: PageQuery & { memberRole?: number; joinStatus?: number }) =>
+  get<PageResponse<MemberItem>>(`/v1/courses/${courseId}/members`, params)
+
 export const joinCourse = (courseId: string) =>
   post<void>(`/v1/courses/${courseId}/join`)
 
-/** 退出课程 */
-export const leaveCourse = (courseId: string) =>
-  del<void>(`/v1/courses/${courseId}/leave`)
+export const quitCourse = (courseId: string) =>
+  del<void>(`/v1/courses/${courseId}/quit`)
 
-/** 教师：创建课程 */
-export const createCourse = (data: Record<string, unknown>) =>
-  post<{ courseId: string }>('/v1/courses', data)
+export const approveMember = (courseId: string, userId: string, approve: boolean, reason?: string) =>
+  put<void>(`/v1/courses/${courseId}/members/${userId}/approve`, { approve, reason })
 
-/** 教师：更新课程 */
-export const updateCourse = (courseId: string, data: Record<string, unknown>) =>
-  put<void>(`/v1/courses/${courseId}`, data)
+export const checkMembership = (courseId: string, userId: string) =>
+  get<{ isMember: boolean; memberRole?: number; joinStatus?: number }>(`/v1/courses/${courseId}/members/check`, { userId })
 
-/** 获取课程章节 */
-export const getChapters = (courseId: string) =>
-  get<unknown[]>(`/v1/courses/${courseId}/chapters`)
+// ===================== 公告 =====================
 
-/** 获取课程公告 */
-export const getNotices = (courseId: string, params?: PageQuery) =>
-  get<PageResponse<Record<string, unknown>>>(`/v1/courses/${courseId}/notices`, params)
+export const getAnnouncementList = (courseId: string, params?: PageQuery & { keyword?: string; isTop?: number }) =>
+  get<PageResponse<AnnouncementItem>>(`/v1/courses/${courseId}/announcements`, params)
 
-/** 获取课程任务列表 */
-export const getCourseTasks = (courseId: string, params?: PageQuery) =>
-  get<PageResponse<Record<string, unknown>>>(`/v1/courses/${courseId}/tasks`, params)
+export const getAnnouncementDetail = (courseId: string, id: string) =>
+  get<AnnouncementItem>(`/v1/courses/${courseId}/announcements/${id}`)
 
-/** 学生提交任务答案 */
-export const submitTaskAnswer = (courseId: string, taskId: string, data: Record<string, unknown>) =>
-  post<void>(`/v1/courses/${courseId}/tasks/${taskId}/submit`, data)
+export const createAnnouncement = (courseId: string, data: { title: string; content: string; isTop?: number }) =>
+  post<string>(`/v1/courses/${courseId}/announcements`, data)
 
-/** 获取课程成员列表 */
-export const getCourseMembers = (courseId: string, params?: PageQuery) =>
-  get<PageResponse<Record<string, unknown>>>(`/v1/courses/${courseId}/members`, params)
+export const deleteAnnouncement = (courseId: string, id: string) =>
+  del<void>(`/v1/courses/${courseId}/announcements/${id}`)
+
+export const toggleAnnouncementTop = (courseId: string, id: string, isTop: number) =>
+  put<void>(`/v1/courses/${courseId}/announcements/${id}/top`, null, { params: { isTop } })
+
+// ===================== 考试（学生端） =====================
+
+export const getStudentExamList = (params?: PageQuery & { courseId?: string; status?: number }) =>
+  get<PageResponse<TaskItem>>('/v1/student/exams', params)
+
+export const getExamDetail = (taskId: string) =>
+  get<Record<string, unknown>>(`/v1/student/exams/${taskId}`)
+
+export const startExam = (taskId: string) =>
+  post<{ recordId: string }>(`/v1/student/exams/${taskId}/start`)
+
+export const saveAnswer = (data: { recordId: string; questionId: string; answer: string }) =>
+  post<void>('/v1/student/answers/save', data)
+
+export const submitExam = (recordId: string) =>
+  post<void>(`/v1/student/answers/${recordId}/submit`)
+
+// ===================== 批改（教师端） =====================
+
+export const getGradingPending = (taskId: string, params?: PageQuery) =>
+  get<PageResponse<Record<string, unknown>>>('/v1/grading/pending', { taskId, ...params })
+
+export const gradeAnswer = (data: { answerId: string; score: number; comment?: string }) =>
+  post<void>('/v1/grading/grade', data)
+
+export const publishGrades = (recordId: string) =>
+  post<void>(`/v1/grading/${recordId}/publish`)

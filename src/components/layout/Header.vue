@@ -1,6 +1,6 @@
 <template>
   <div class="app-header">
-    <!-- 左侧：折叠按钮 + 面包屑 -->
+    <!-- 左：折叠按钮 + 面包屑 -->
     <div class="header-left">
       <el-button
         class="collapse-btn"
@@ -15,23 +15,19 @@
       </el-breadcrumb>
     </div>
 
-    <!-- 右侧：用户信息 -->
+    <!-- 右：通知 + 用户头像 -->
     <div class="header-right">
-      <!-- 通知图标（占位，后续接 WebSocket） -->
-      <el-button text :icon="Bell" circle class="icon-btn" />
+      <el-button text circle class="icon-btn" :icon="Bell" />
 
-      <!-- 用户头像下拉 -->
       <el-dropdown trigger="click" @command="handleCommand">
         <div class="user-info">
-          <el-avatar
-            :src="authStore.userInfo?.avatar"
-            :size="32"
-            class="avatar"
-          >
-            {{ authStore.userInfo?.realName?.charAt(0) }}
+          <el-avatar :src="authStore.userInfo?.avatar" :size="32" class="header-avatar">
+            {{ authStore.userInfo?.realName?.charAt(0) || authStore.userInfo?.username?.charAt(0) }}
           </el-avatar>
-          <span class="username">{{ authStore.userInfo?.realName || authStore.userInfo?.username }}</span>
-          <el-icon class="arrow"><ArrowDown /></el-icon>
+          <span class="username">
+            {{ authStore.userInfo?.realName || authStore.userInfo?.username }}
+          </span>
+          <el-icon class="arrow-icon"><ArrowDown /></el-icon>
         </div>
         <template #dropdown>
           <el-dropdown-menu>
@@ -65,17 +61,13 @@ async function handleCommand(cmd: string) {
   if (cmd === 'profile') {
     router.push('/profile')
   } else if (cmd === 'logout') {
-    try {
-      await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-        type: 'warning',
-        confirmButtonText: '退出',
-        cancelButtonText: '取消',
-      })
-      authStore.logout()
-      router.replace('/login')
-    } catch {
-      // 取消退出
-    }
+    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+      type: 'warning',
+      confirmButtonText: '退出',
+      cancelButtonText: '取消',
+    }).catch(() => null)
+    authStore.logout()
+    router.replace('/login')
   }
 }
 </script>
@@ -89,6 +81,8 @@ async function handleCommand(cmd: string) {
   justify-content: space-between;
   padding: 0 20px 0 8px;
   box-sizing: border-box;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .header-left {
@@ -97,13 +91,8 @@ async function handleCommand(cmd: string) {
   gap: 8px;
 }
 
-.collapse-btn {
-  color: var(--el-text-color-regular);
-}
-
-.breadcrumb {
-  font-size: 14px;
-}
+.collapse-btn { color: #546e7a; }
+.breadcrumb { font-size: 14px; }
 
 .header-right {
   display: flex;
@@ -111,35 +100,30 @@ async function handleCommand(cmd: string) {
   gap: 8px;
 }
 
-.icon-btn {
-  color: var(--el-text-color-regular);
-}
+.icon-btn { color: #546e7a; }
 
 .user-info {
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 5px 10px;
   border-radius: 8px;
   transition: background 0.2s;
 }
 
-.user-info:hover {
-  background: var(--el-fill-color-light);
-}
+.user-info:hover { background: var(--primary-hover); }
+
+.header-avatar { border: 2px solid #ffcdd2; }
 
 .username {
   font-size: 14px;
   color: var(--el-text-color-primary);
-  max-width: 100px;
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.arrow {
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
+.arrow-icon { font-size: 12px; color: var(--el-text-color-secondary); }
 </style>

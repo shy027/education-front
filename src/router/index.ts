@@ -195,28 +195,27 @@ const router = createRouter({
 })
 
 // ===================== 路由守卫 =====================
-router.beforeEach((to, _from, next) => {
+router.beforeEach((to, _from) => {
   const authStore = useAuthStore()
 
   // 1. 已登录访问 /login → 跳首页
   if (to.path === '/login' && authStore.isLoggedIn) {
-    return next('/home')
+    return '/home'
   }
 
   // 2. 需要登录但未登录 → 跳登录页
   if (to.meta.requiresAuth && !authStore.isLoggedIn) {
-    return next({ path: '/login', query: { redirect: to.fullPath } })
+    return { path: '/login', query: { redirect: to.fullPath } }
   }
 
   // 3. 角色权限校验
   const requiredRoles = to.meta.roles
   if (requiredRoles && requiredRoles.length > 0 && authStore.isLoggedIn) {
     if (!authStore.hasAnyRole(requiredRoles)) {
-      return next('/403')
+      return '/403'
     }
   }
-
-  next()
+  // 放行
 })
 
 export default router

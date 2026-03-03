@@ -45,6 +45,7 @@ function toggleSidebar() {
 .main-layout {
   height: 100vh;
   overflow: hidden;
+  min-width: 0;   /* 防止 flex 子项撑开 */
 }
 
 .aside {
@@ -60,6 +61,7 @@ function toggleSidebar() {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-width: 0;  /* 关键：防止 flex 子项溢出视口 */
 }
 
 .header {
@@ -76,12 +78,14 @@ function toggleSidebar() {
   padding: 0;
   overflow: hidden;
   flex: 1;
+  min-width: 0;
   background: var(--bg-page);
 }
 
 .page-wrapper {
   padding: 24px;
-  min-height: calc(100vh - 56px);
+  min-height: 100%;
+  min-width: 0;         /* 防止内容（宽表格/4列网格）撑开父容器 */
   box-sizing: border-box;
 }
 

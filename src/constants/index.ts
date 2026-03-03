@@ -92,7 +92,6 @@ export const STORAGE_KEYS = {
 export const STUDENT_MENUS = [
   { title: '首页', icon: 'House', path: '/home' },
   { title: '我的课程', icon: 'Reading', path: '/course' },
-  { title: '研讨社区', icon: 'ChatDotRound', path: '/community' },
   { title: '资源库', icon: 'FolderOpened', path: '/resource' },
   { title: '素养报告', icon: 'DataLine', path: '/report' },
   { title: '个人中心', icon: 'User', path: '/profile' },
@@ -101,9 +100,19 @@ export const STUDENT_MENUS = [
 export const TEACHER_MENUS = [
   { title: '首页', icon: 'House', path: '/home' },
   { title: '课程管理', icon: 'Reading', path: '/course' },
-  { title: '研讨社区', icon: 'ChatDotRound', path: '/community' },
   { title: '资源库', icon: 'FolderOpened', path: '/resource' },
   { title: '课程报告', icon: 'DataLine', path: '/report' },
+  { title: '个人中心', icon: 'User', path: '/profile' },
+]
+
+/** 校领导菜单 = 教师菜单 + 学校管理入口 */
+export const SCHOOL_LEADER_MENUS = [
+  { title: '首页', icon: 'House', path: '/home' },
+  { title: '课程管理', icon: 'Reading', path: '/course' },
+  { title: '资源库', icon: 'FolderOpened', path: '/resource' },
+  { title: '课程报告', icon: 'DataLine', path: '/report' },
+  { title: '学校管理', icon: 'OfficeBuilding', path: '/admin/schools' },
+  { title: '内容审核', icon: 'CircleCheckFilled', path: '/admin/audit' },
   { title: '个人中心', icon: 'User', path: '/profile' },
 ]
 

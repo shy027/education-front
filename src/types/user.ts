@@ -26,17 +26,18 @@ export interface SendCodeRequest {
   phone: string
 }
 
-/** 登录响应 */
+/** 登录响应 - 后端实际结构 */
 export interface LoginResponse {
   token: string
-  tokenType: string
-  userId: string
-  username: string
-  realName: string
-  avatar: string
-  roles: UserRole[]
-  schoolId: string | null
-  schoolName: string | null
+  userInfo: {
+    userId: string
+    username: string
+    realName: string
+    avatar: string
+    roles: UserRole[]
+    schoolId?: string | null
+    schoolName?: string | null
+  }
 }
 
 /** 当前用户信息 */

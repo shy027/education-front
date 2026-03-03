@@ -40,7 +40,7 @@ import {
   DataBoard, UserFilled, OfficeBuilding, CircleCheckFilled, Document,
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
-import { STUDENT_MENUS, TEACHER_MENUS, ADMIN_MENUS } from '@/constants'
+import { STUDENT_MENUS, TEACHER_MENUS, SCHOOL_LEADER_MENUS, ADMIN_MENUS } from '@/constants'
 
 defineProps<{ collapsed: boolean }>()
 
@@ -48,7 +48,8 @@ const route = useRoute()
 const authStore = useAuthStore()
 
 const menus = computed(() => {
-  if (authStore.isAdmin || authStore.isSchoolLeader) return ADMIN_MENUS
+  if (authStore.isAdmin) return ADMIN_MENUS
+  if (authStore.isSchoolLeader) return SCHOOL_LEADER_MENUS   // 校领导：教师级 + 学校管理
   if (authStore.isTeacher) return TEACHER_MENUS
   return STUDENT_MENUS
 })

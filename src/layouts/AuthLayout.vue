@@ -22,7 +22,7 @@
       </ul>
 
       <div class="brand-footer">
-        <el-icon><ShieldCheckFilled /></el-icon>
+        <el-icon><CircleCheckFilled /></el-icon>
         <span>数据加密存储 · 安全认证 · 隐私保护</span>
       </div>
     </div>
@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { Reading, CircleCheckFilled, ShieldCheckFilled } from '@element-plus/icons-vue'
+import { Reading, CircleCheckFilled } from '@element-plus/icons-vue'
 
 const features = [
   '智能案例库与思政元素精准匹配',

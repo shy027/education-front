@@ -20,15 +20,16 @@
         </div>
         <!-- 操作区 -->
         <div class="hero-actions">
+          <!-- 加入/退出：仅学生可见，教师（无论是否是该课程创建者）均不显示 -->
           <el-button
-            v-if="!authStore.isTeacher && !isMember"
+            v-if="!authStore.isTeacher && !authStore.isAdmin && !isMember"
             type="primary"
             class="join-btn"
             :loading="joining"
             @click="handleJoin"
           >加入课程</el-button>
           <el-button
-            v-if="isMember && !authStore.isTeacher"
+            v-if="!authStore.isTeacher && !authStore.isAdmin && isMember"
             type="danger"
             plain
             :loading="quitting"
@@ -269,7 +270,7 @@ import {
   getCourseDetail, getChapterTree, getCoursewareList, createCourseware, deleteCourseware,
   getTaskList, createTask, deleteTask,
   getAnnouncementList, createAnnouncement, deleteAnnouncement,
-  joinCourse, quitCourse,
+  joinCourse, quitCourse, getMyCourses,
 } from '@/api/course'
 import { getPostList, createPost } from '@/api/community'
 import { logBehavior } from '@/api/report'
@@ -492,12 +493,16 @@ onMounted(async () => {
       fetchAnnouncements(),
     ])
     course.value = detail
-    // 判断是否已是成员（教师视角默认是"自己的课程即成员"）
-    if (authStore.isTeacher) {
-      isMember.value = detail.teacherId === authStore.userInfo?.userId
-    } else {
-      // 学生：从 getMyCourses 判断（简化：只看 status=1）
-      isMember.value = false
+
+    // 教师/管理员不涉及加入退出，学生通过 getMyCourses 判断是否已加入
+    if (!authStore.isTeacher && !authStore.isAdmin) {
+      try {
+        const myData = await getMyCourses()
+        const joined = myData.learning ?? []
+        isMember.value = joined.some((c) => String(c.courseId ?? c.id) === courseId.value)
+      } catch {
+        isMember.value = false
+      }
     }
   } finally {
     pageLoading.value = false

@@ -42,9 +42,29 @@ export interface CourseQuery extends PageQuery {
   teacherId?: string
 }
 
+/** 我的课程响应 - 后端实际字段名 */
+export interface MyCourseItem {
+  courseId: string
+  courseCode?: string
+  courseName: string
+  courseCover?: string
+  subjectArea?: string
+  myRole?: number
+  studentCount?: number
+  status: number
+  // 以下为兼容旧字段（若后端同时返回）
+  id?: string
+  cover?: string
+  teacherId?: string
+  teacherName?: string
+  memberCount?: number
+  createdTime?: string
+}
+
 export interface MyCoursesResponse {
-  teachingCourses: CourseItem[]
-  joinedCourses: CourseItem[]
+  teaching: MyCourseItem[]     // 我教的课程
+  learning: MyCourseItem[]     // 我学的课程
+  assisting: MyCourseItem[]    // 我协助的课程（助教）
 }
 
 export interface ChapterNode {

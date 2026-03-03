@@ -200,7 +200,24 @@ async function fetchList() {
   try {
     if (activeTab.value === 'mine') {
       const res = await getMyCourses()
-      const list = authStore.isTeacher ? (res.teachingCourses ?? []) : (res.joinedCourses ?? [])
+      const raw = authStore.isTeacher
+        ? [...(res.teaching ?? []), ...(res.assisting ?? [])]
+        : (res.learning ?? [])
+      // 将 MyCourseItem 映射为页面使用的结构格式
+      const list = raw.map((c) => ({
+        id: String(c.courseId ?? c.id ?? ''),
+        courseName: c.courseName,
+        description: '',
+        cover: c.courseCover ?? c.cover ?? '',
+        status: c.status ?? 0,
+        joinType: 0,
+        teacherId: '',
+        teacherName: c.teacherName ?? '',
+        memberCount: c.studentCount ?? c.memberCount ?? 0,
+        subjectArea: c.subjectArea ?? '',
+        auditStatus: 0,
+        createdTime: c.createdTime ?? '',
+      }))
       // 客户端关键词过滤
       const kw = searchKeyword.value.toLowerCase()
       courseList.value = kw ? list.filter((c) => c.courseName.toLowerCase().includes(kw)) : list

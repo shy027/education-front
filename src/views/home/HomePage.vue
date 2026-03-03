@@ -50,12 +50,12 @@
         <div v-else class="course-list">
           <div
             v-for="c in myCourses"
-            :key="c.id"
+            :key="c.courseId || c.id"
             class="course-item"
-            @click="$router.push(`/course/${c.id}`)"
+            @click="$router.push(`/course/${c.courseId || c.id}`)"
           >
             <div class="course-cover">
-              <img v-if="c.cover" :src="c.cover" :alt="c.courseName" />
+              <img v-if="c.courseCover || c.cover" :src="c.courseCover || c.cover" :alt="c.courseName" />
               <div v-else class="cover-placeholder">
                 <el-icon :size="28" color="#fff"><Reading /></el-icon>
               </div>
@@ -63,14 +63,15 @@
             <div class="course-info">
               <div class="course-name">{{ c.courseName }}</div>
               <div class="course-meta">
-                <span>{{ c.teacherName }}</span>
+                <span v-if="c.teacherName">{{ c.teacherName }}</span>
+                <span v-if="c.subjectArea" class="subject">{{ c.subjectArea }}</span>
                 <el-tag size="small" :type="courseStatusType(c.status)">
                   {{ courseStatusLabel(c.status) }}
                 </el-tag>
               </div>
               <div class="course-members">
                 <el-icon><UserFilled /></el-icon>
-                {{ c.memberCount }} 人参与
+                {{ c.studentCount ?? c.memberCount ?? 0 }} 人参与
               </div>
             </div>
           </div>
@@ -103,7 +104,7 @@
 import { ref, computed, markRaw, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { getMyCourses } from '@/api/course'
-import type { CourseItem } from '@/api/course'
+import type { MyCourseItem } from '@/api/course'
 import {
   Reading, UserFilled, Bell, InfoFilled,
   Collection, Comment, DataAnalysis, Trophy,
@@ -131,17 +132,20 @@ const currentDate = computed(() => new Date().toLocaleDateString('zh-CN', {
 
 // ───── 我的课程 ─────
 const loading = ref(false)
-const myCourses = ref<CourseItem[]>([])
+const myCourses = ref<MyCourseItem[]>([])
 
 async function fetchMyCourses() {
   loading.value = true
   try {
     const res = await getMyCourses()
-    myCourses.value = authStore.isTeacher
-      ? (res.teachingCourses ?? []).slice(0, 6)
-      : (res.joinedCourses ?? []).slice(0, 6)
+    // 后端返回字段名称： teaching/learning/assisting
+    if (authStore.isTeacher) {
+      myCourses.value = [...(res.teaching ?? []), ...(res.assisting ?? [])].slice(0, 6)
+    } else {
+      myCourses.value = (res.learning ?? []).slice(0, 6)
+    }
   } catch {
-    // 静默失败，显示空状态
+    myCourses.value = []
   } finally {
     loading.value = false
   }

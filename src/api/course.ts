@@ -22,14 +22,17 @@ export interface CourseItem {
   courseName: string
   description: string
   cover: string
-  status: number          // 0=草稿 1=发布 2=归档
+  courseCover?: string
+  status: number          // 0=草稿 1=进行中 2=已归档
   joinType: number
   teacherId: string
   teacherName: string
   memberCount: number
+  studentCount?: number
   subjectArea: string
   auditStatus: number
   createdTime: string
+  endTime?: string        // 结束时间，为空表示永不结束
 }
 
 export interface CourseQuery extends PageQuery {
@@ -48,6 +51,7 @@ export interface MyCourseItem {
   courseCode?: string
   courseName: string
   courseCover?: string
+  courseIntro?: string
   subjectArea?: string
   myRole?: number
   studentCount?: number

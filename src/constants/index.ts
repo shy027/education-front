@@ -123,5 +123,6 @@ export const ADMIN_MENUS = [
   { title: '审核中心', icon: 'CircleCheckFilled', path: '/admin/audit' },
   { title: '资源管理', icon: 'FolderOpened', path: '/admin/resources' },
   { title: '报告管理', icon: 'Document', path: '/admin/reports' },
+  { title: '学科管理', icon: 'FolderOpened', path: '/admin/subjects' },
   { title: '个人中心', icon: 'User', path: '/profile' },
 ]

@@ -164,6 +164,12 @@ const routes: RouteRecordRaw[] = [
             component: () => import('@/views/admin/ReportsPage.vue'),
             meta: { title: '报告管理', icon: 'Document', roles: ['ADMIN', 'SCHOOL_LEADER'] },
           },
+          {
+            path: 'subjects',
+            name: 'AdminSubjects',
+            component: () => import('@/views/admin/SubjectManagePage.vue'),
+            meta: { title: '学科分类管理', icon: 'FolderOpened', roles: ['ADMIN'] },
+          },
         ],
       },
     ],

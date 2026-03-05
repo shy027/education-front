@@ -31,12 +31,32 @@
       />
     </div>
 
-    <!-- 筛选条件 -->
+    <!-- 学科领域标签筛选 -->
+    <div class="subject-filter">
+      <span class="subject-label">学科领域</span>
+      <div class="subject-tags">
+        <button
+          class="subject-tag"
+          :class="{ active: !query.subjectArea }"
+          @click="selectSubject('')"
+        >
+          不限
+        </button>
+        <button
+          v-for="s in subjectAreaOptions"
+          :key="s"
+          class="subject-tag"
+          :class="{ active: query.subjectArea === s }"
+          @click="selectSubject(s)"
+        >
+          {{ s }}
+        </button>
+      </div>
+    </div>
+
+    <!-- 其他筛选条件 -->
     <el-card class="filter-card" shadow="never">
       <el-form :model="query" inline>
-        <el-form-item label="学科领域">
-          <el-input v-model="query.subjectArea" placeholder="不限" clearable style="width: 130px" />
-        </el-form-item>
         <el-form-item label="加入方式">
           <el-select v-model="query.joinType" placeholder="不限" clearable style="width: 110px">
             <el-option label="公开加入" :value="0" />
@@ -47,8 +67,8 @@
         <el-form-item v-if="authStore.isTeacher || authStore.isAdmin" label="状态">
           <el-select v-model="query.status" placeholder="不限" clearable style="width: 100px">
             <el-option label="草稿" :value="0" />
-            <el-option label="发布中" :value="1" />
-            <el-option label="已归档" :value="2" />
+            <el-option label="进行中" :value="1" />
+            <el-option label="已结课" :value="2" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -71,8 +91,8 @@
           <div v-else class="cover-default">
             <el-icon :size="36" color="#fff"><Reading /></el-icon>
           </div>
-          <el-tag class="status-tag" size="small" :type="statusType(c.status)">
-            {{ statusLabel(c.status) }}
+          <el-tag class="status-tag" size="small" :type="statusType(c)">
+            {{ statusLabel(c) }}
           </el-tag>
         </div>
         <div class="card-body">
@@ -141,7 +161,14 @@
           <el-input v-model="createForm.description" type="textarea" placeholder="请输入课程简介" :rows="3" maxlength="200" show-word-limit />
         </el-form-item>
         <el-form-item label="学科领域">
-          <el-input v-model="createForm.subjectArea" placeholder="如：马克思主义理论" clearable />
+          <el-select v-model="createForm.subjectArea" placeholder="请选择学科领域" clearable>
+            <el-option
+              v-for="s in subjectAreaOptions"
+              :key="s"
+              :label="s"
+              :value="s"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="加入方式" prop="joinType">
           <el-radio-group v-model="createForm.joinType">
@@ -165,7 +192,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -173,6 +200,7 @@ import { Plus, Search, Reading, User, UserFilled } from '@element-plus/icons-vue
 import { useAuthStore } from '@/stores/auth'
 import { getCourseList, getMyCourses, joinCourse, createCourse } from '@/api/course'
 import type { CourseItem, CourseCreateReq } from '@/api/course'
+import { getAllEnabledSubjects } from '@/api/subject'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -194,6 +222,25 @@ const query = reactive({
   pageSize: 12,
 })
 
+// ───── 学科领域标签 ─────
+const subjectAreaOptions = ref<string[]>([])
+
+async function fetchSubjects() {
+  try {
+    const res = await getAllEnabledSubjects()
+    // 提取所有启用的学科名称
+    subjectAreaOptions.value = (res || []).map(item => item.name)
+  } catch (error: any) {
+    ElMessage.error(error.message || '获取学科分类失败')
+  }
+}
+
+function selectSubject(s: string) {
+  query.subjectArea = s || undefined
+  query.pageNum = 1
+  fetchList()
+}
+
 // ───── 加载课程 ─────
 async function fetchList() {
   loading.value = true
@@ -207,11 +254,11 @@ async function fetchList() {
       const list = raw.map((c) => ({
         id: String(c.courseId ?? c.id ?? ''),
         courseName: c.courseName,
-        description: '',
+        description: c.courseIntro ?? '',
         cover: c.courseCover ?? c.cover ?? '',
         status: c.status ?? 0,
         joinType: 0,
-        teacherId: '',
+        teacherId: String(c.teacherId ?? ''),
         teacherName: c.teacherName ?? '',
         memberCount: c.studentCount ?? c.memberCount ?? 0,
         subjectArea: c.subjectArea ?? '',
@@ -256,11 +303,18 @@ function switchTab(tab: 'all' | 'mine') {
 }
 
 // ───── 标签显示 ─────
-function statusType(s: number): '' | 'info' | 'success' | 'warning' {
-  return ({ 0: 'info', 1: 'success', 2: 'warning' } as Record<number, '' | 'info' | 'success' | 'warning'>)[s] ?? ''
+/** 判断课程是否已过结束时间（前端实时计算，弥补后端定时任务窗口期） */
+function isExpired(c: CourseItem): boolean {
+  return c.status === 1 && !!c.endTime && new Date(c.endTime) < new Date()
 }
-function statusLabel(s: number): string {
-  return ({ 0: '草稿', 1: '进行中', 2: '已归档' } as Record<number, string>)[s] ?? '未知'
+
+function statusType(c: CourseItem): '' | 'info' | 'success' | 'warning' {
+  if (isExpired(c)) return 'warning'
+  return ({ 0: 'info', 1: 'success', 2: 'warning' } as Record<number, '' | 'info' | 'success' | 'warning'>)[c.status] ?? ''
+}
+function statusLabel(c: CourseItem): string {
+  if (isExpired(c)) return '已结课'
+  return ({ 0: '草稿', 1: '进行中', 2: '已结课' } as Record<number, string>)[c.status] ?? '未知'
 }
 
 // ───── 加入课程 ─────
@@ -322,11 +376,64 @@ async function handleCreate() {
   }
 }
 
-onMounted(fetchList)
+onMounted(() => {
+  fetchSubjects()
+  fetchList()
+})
 </script>
 
 <style scoped>
 .course-list-page { display: flex; flex-direction: column; gap: 16px; }
+
+/* ===== 学科领域标签筛选 ===== */
+.subject-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  flex-wrap: wrap;
+}
+
+.subject-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #546e7a;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.subject-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.subject-tag {
+  padding: 4px 14px;
+  border-radius: 20px;
+  border: 1.5px solid #e0e0e0;
+  background: #fafafa;
+  color: #546e7a;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.18s;
+  line-height: 1.6;
+}
+.subject-tag:hover {
+  border-color: #ffcdd2;
+  color: #d32f2f;
+  background: #fff5f5;
+}
+.subject-tag.active {
+  background: linear-gradient(135deg, #ff5252, #d32f2f);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+}
+
 
 .page-header { display: flex; align-items: flex-start; justify-content: space-between; }
 .page-title { margin: 0 0 4px; font-size: 20px; font-weight: 700; color: #263238; }

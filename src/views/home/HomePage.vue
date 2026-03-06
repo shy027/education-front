@@ -156,7 +156,7 @@ function courseStatusType(status: number): '' | 'success' | 'info' | 'warning' |
 }
 
 function courseStatusLabel(status: number): string {
-  return ({ 0: '草稿', 1: '进行中', 2: '已归档' } as Record<number, string>)[status] ?? '未知'
+  return ({ 0: '暂未开放', 1: '进行中', 2: '已结课' } as Record<number, string>)[status] ?? '未知'
 }
 
 // ───── 统计卡片 ─────

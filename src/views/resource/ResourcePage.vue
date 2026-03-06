@@ -42,27 +42,6 @@
 
       <!-- 筛选区 -->
       <div class="filter-row">
-        <!-- 分类 -->
-        <div class="filter-group">
-          <span class="filter-label">分类：</span>
-          <el-scrollbar class="cate-scroll">
-            <div class="cate-pills">
-              <button
-                class="cate-pill"
-                :class="{ active: !query.categoryId }"
-                @click="selectCategory(undefined)"
-              >全部</button>
-              <button
-                v-for="c in flatCategories"
-                :key="c.id"
-                class="cate-pill"
-                :class="{ active: query.categoryId === c.id }"
-                @click="selectCategory(c.id)"
-              >{{ c.categoryName }}</button>
-            </div>
-          </el-scrollbar>
-        </div>
-
         <!-- 标签 -->
         <div class="filter-group">
           <span class="filter-label">标签：</span>
@@ -70,7 +49,7 @@
             <div class="cate-pills">
               <button class="cate-pill" :class="{ active: !query.tagId }" @click="selectTag(undefined)">不限</button>
               <button
-                v-for="tag in enabledTags.slice(0, 15)"
+                v-for="tag in enabledTags"
                 :key="tag.id"
                 class="cate-pill"
                 :class="{ active: query.tagId === tag.id }"
@@ -174,8 +153,8 @@
 import { ref, reactive, computed, markRaw, onMounted } from 'vue'
 import { Plus, Search, View, VideoPlay, Document, Headset, Reading } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
-import { getResourceList, getCategoryTree, getEnabledTags } from '@/api/resource'
-import type { ResourceItem, CategoryNode, TagItem, ResourceQuery } from '@/api/resource'
+import { getResourceList, getEnabledTags } from '@/api/resource'
+import type { ResourceItem, TagItem, ResourceQuery } from '@/api/resource'
 
 const authStore = useAuthStore()
 
@@ -224,17 +203,6 @@ async function fetchResources() {
 
 function handleSearch() { query.pageNum = 1; fetchResources() }
 
-// ─── 分类 ───
-const categoryTree = ref<CategoryNode[]>([])
-const flatCategories = computed(() => {
-  const flat: { id: string; categoryName: string }[] = []
-  const walk = (nodes: CategoryNode[]) => nodes.forEach((n) => { flat.push(n); if (n.children) walk(n.children) })
-  walk(categoryTree.value)
-  return flat
-})
-
-function selectCategory(id: string | undefined) { query.categoryId = id; query.pageNum = 1; fetchResources() }
-
 // ─── 标签 ───
 const enabledTags = ref<TagItem[]>([])
 function selectTag(id: string | undefined) { query.tagId = id; query.pageNum = 1; fetchResources() }
@@ -242,7 +210,6 @@ function selectTag(id: string | undefined) { query.tagId = id; query.pageNum = 1
 onMounted(async () => {
   await Promise.all([
     fetchResources(),
-    getCategoryTree().then((r) => { categoryTree.value = r }),
     getEnabledTags().then((r) => { enabledTags.value = r }),
   ])
 })

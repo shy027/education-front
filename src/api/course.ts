@@ -23,7 +23,7 @@ export interface CourseItem {
   description: string
   cover: string
   courseCover?: string
-  status: number          // 0=草稿 1=进行中 2=已归档
+  status: number          // 0=草稿 1=进行中 2=已结课
   joinType: number
   teacherId: string
   teacherName: string
@@ -56,6 +56,7 @@ export interface MyCourseItem {
   myRole?: number
   studentCount?: number
   status: number
+  endTime?: string
   // 以下为兼容旧字段（若后端同时返回）
   id?: string
   cover?: string

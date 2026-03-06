@@ -29,10 +29,10 @@ const routes: RouteRecordRaw[] = [
     ],
   },
 
-  // === 主应用（需登录） ===
+  // === 前台业务（需登录，全用户共用 FrontLayout） ===
   {
     path: '/',
-    component: () => import('@/layouts/MainLayout.vue'),
+    component: () => import('@/layouts/FrontLayout.vue'),
     meta: { requiresAuth: true },
     children: [
       {
@@ -60,12 +60,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '课程详情', hideInMenu: true },
       },
 
-      // 研讨社区
+      // 研讨社区（依附于具体课程，前台不提供独立入口）
       {
         path: 'community',
         name: 'Community',
         component: () => import('@/views/community/CommunityPage.vue'),
-        meta: { title: '研讨社区', icon: 'ChatDotRound' },
+        meta: { title: '研讨社区', hideInMenu: true },
       },
       {
         path: 'community/topic/:id',
@@ -115,62 +115,64 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/profile/ProfilePage.vue'),
         meta: { title: '个人中心', icon: 'User' },
       },
+    ]
+  },
 
-      // 管理后台（仅 ADMIN/SCHOOL_LEADER）
+  // === 管理后台（仅 ADMIN/SCHOOL_LEADER，使用 MainLayout） ===
+  {
+    path: '/admin',
+    component: () => import('@/layouts/MainLayout.vue'),
+    meta: {
+      requiresAuth: true,
+      title: '管理后台',
+      roles: ['ADMIN', 'SCHOOL_LEADER'],
+    },
+    children: [
       {
-        path: 'admin',
-        meta: {
-          title: '管理后台',
-          roles: ['ADMIN', 'SCHOOL_LEADER'],
-        },
-        children: [
-          {
-            path: '',
-            redirect: '/admin/dashboard',
-          },
-          {
-            path: 'dashboard',
-            name: 'AdminDashboard',
-            component: () => import('@/views/admin/DashboardPage.vue'),
-            meta: { title: '数据看板', icon: 'DataBoard' },
-          },
-          {
-            path: 'users',
-            name: 'AdminUsers',
-            component: () => import('@/views/admin/UsersPage.vue'),
-            meta: { title: '用户管理', icon: 'UserFilled', roles: ['ADMIN', 'SCHOOL_LEADER'] },
-          },
-          {
-            path: 'schools',
-            name: 'AdminSchools',
-            component: () => import('@/views/admin/SchoolsPage.vue'),
-            meta: { title: '学校管理', icon: 'OfficeBuilding', roles: ['ADMIN'] },
-          },
-          {
-            path: 'audit',
-            name: 'AdminAudit',
-            component: () => import('@/views/admin/AuditPage.vue'),
-            meta: { title: '审核中心', icon: 'CircleCheckFilled', roles: ['ADMIN', 'SCHOOL_LEADER'] },
-          },
-          {
-            path: 'resources',
-            name: 'AdminResources',
-            component: () => import('@/views/admin/ResourcesPage.vue'),
-            meta: { title: '资源管理', icon: 'FolderOpened', roles: ['ADMIN'] },
-          },
-          {
-            path: 'reports',
-            name: 'AdminReports',
-            component: () => import('@/views/admin/ReportsPage.vue'),
-            meta: { title: '报告管理', icon: 'Document', roles: ['ADMIN', 'SCHOOL_LEADER'] },
-          },
-          {
-            path: 'subjects',
-            name: 'AdminSubjects',
-            component: () => import('@/views/admin/SubjectManagePage.vue'),
-            meta: { title: '学科分类管理', icon: 'FolderOpened', roles: ['ADMIN'] },
-          },
-        ],
+        path: '',
+        redirect: '/admin/dashboard',
+      },
+      {
+        path: 'dashboard',
+        name: 'AdminDashboard',
+        component: () => import('@/views/admin/DashboardPage.vue'),
+        meta: { title: '数据看板', icon: 'DataBoard' },
+      },
+      {
+        path: 'users',
+        name: 'AdminUsers',
+        component: () => import('@/views/admin/UsersPage.vue'),
+        meta: { title: '用户管理', icon: 'UserFilled', roles: ['ADMIN', 'SCHOOL_LEADER'] },
+      },
+      {
+        path: 'schools',
+        name: 'AdminSchools',
+        component: () => import('@/views/admin/SchoolsPage.vue'),
+        meta: { title: '学校管理', icon: 'OfficeBuilding', roles: ['ADMIN'] },
+      },
+      {
+        path: 'audit',
+        name: 'AdminAudit',
+        component: () => import('@/views/admin/AuditPage.vue'),
+        meta: { title: '审核中心', icon: 'CircleCheckFilled', roles: ['ADMIN', 'SCHOOL_LEADER'] },
+      },
+      {
+        path: 'resources',
+        name: 'AdminResources',
+        component: () => import('@/views/admin/ResourcesPage.vue'),
+        meta: { title: '资源管理', icon: 'FolderOpened', roles: ['ADMIN'] },
+      },
+      {
+        path: 'reports',
+        name: 'AdminReports',
+        component: () => import('@/views/admin/ReportsPage.vue'),
+        meta: { title: '报告管理', icon: 'Document', roles: ['ADMIN', 'SCHOOL_LEADER'] },
+      },
+      {
+        path: 'subjects',
+        name: 'AdminSubjects',
+        component: () => import('@/views/admin/SubjectManagePage.vue'),
+        meta: { title: '学科分类管理', icon: 'FolderOpened', roles: ['ADMIN'] },
       },
     ],
   },

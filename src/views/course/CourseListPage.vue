@@ -64,9 +64,9 @@
             <el-option label="邀请码" :value="2" />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="authStore.isTeacher || authStore.isAdmin" label="状态">
-          <el-select v-model="query.status" placeholder="不限" clearable style="width: 100px">
-            <el-option label="草稿" :value="0" />
+        <el-form-item label="状态">
+          <el-select v-model="query.status" placeholder="进行中" clearable style="width: 100px">
+            <el-option label="暂未开放" :value="0" />
             <el-option label="进行中" :value="1" />
             <el-option label="已结课" :value="2" />
           </el-select>
@@ -217,7 +217,7 @@ const query = reactive({
   keyword: '',
   subjectArea: '' as string | undefined,
   joinType: undefined as number | undefined,
-  status: undefined as number | undefined,
+  status: 1 as number | undefined, // 默认显示进行中
   pageNum: 1,
   pageSize: 12,
 })
@@ -264,11 +264,28 @@ async function fetchList() {
         subjectArea: c.subjectArea ?? '',
         auditStatus: 0,
         createdTime: c.createdTime ?? '',
+        endTime: c.endTime,
       }))
-      // 客户端关键词过滤
-      const kw = searchKeyword.value.toLowerCase()
-      courseList.value = kw ? list.filter((c) => c.courseName.toLowerCase().includes(kw)) : list
-      total.value = courseList.value.length
+      // 客户端多维度过滤
+      const kw = searchKeyword.value.trim().toLowerCase()
+      let filteredList = list
+      
+      if (kw) {
+        filteredList = filteredList.filter((c) => c.courseName.toLowerCase().includes(kw))
+      }
+      if (query.subjectArea) {
+        filteredList = filteredList.filter((c) => c.subjectArea === query.subjectArea)
+      }
+      if (query.status !== undefined && query.status !== null && query.status !== '') {
+        filteredList = filteredList.filter((c) => c.status === query.status)
+      }
+      
+      total.value = filteredList.length
+      
+      // 客户端分页
+      const start = (query.pageNum - 1) * query.pageSize
+      const end = start + query.pageSize
+      courseList.value = filteredList.slice(start, end)
     } else {
       query.keyword = searchKeyword.value
       const res = await getCourseList({
@@ -292,7 +309,7 @@ function handleSearch() {
 
 function handleReset() {
   searchKeyword.value = ''
-  Object.assign(query, { keyword: '', subjectArea: undefined, joinType: undefined, status: undefined, pageNum: 1 })
+  Object.assign(query, { keyword: '', subjectArea: undefined, joinType: undefined, status: 1, pageNum: 1 })
   fetchList()
 }
 
@@ -314,7 +331,7 @@ function statusType(c: CourseItem): '' | 'info' | 'success' | 'warning' {
 }
 function statusLabel(c: CourseItem): string {
   if (isExpired(c)) return '已结课'
-  return ({ 0: '草稿', 1: '进行中', 2: '已结课' } as Record<number, string>)[c.status] ?? '未知'
+  return ({ 0: '暂未开放', 1: '进行中', 2: '已结课' } as Record<number, string>)[c.status] ?? '未知'
 }
 
 // ───── 加入课程 ─────

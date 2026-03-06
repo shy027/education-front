@@ -295,8 +295,10 @@ const isMyTeaching = computed(() =>
   authStore.isTeacher && course.value?.teacherId === authStore.userInfo?.userId,
 )
 
-function statusType(s: number): '' | 'info' | 'success' | 'warning' { return ({ 0: 'info', 1: 'success', 2: 'warning' } as Record<number, '' | 'info' | 'success' | 'warning'>)[s] ?? 'info' }
-function statusLabel(s: number): string { return ({ 0: '草稿', 1: '进行中', 2: '已归档' } as Record<number, string>)[s] ?? '未知' }
+function statusType(s: number): '' | 'info' | 'success' | 'warning' { return ({ 0: 'info', 1: 'success', 2: 'warning' } as Record<number, '' | 'info' | 'success' | 'warning'>)[s] ?? '' }
+function statusLabel(s: number): string { return ({ 0: '暂未开放', 1: '进行中', 2: '已结课' } as Record<number, string>)[s] ?? '未知' }
+
+// ───── 操作处理 ─────
 function joinTypeLabel(t: number): string { return ({ 0: '公开加入', 1: '审批加入', 2: '邀请码' } as Record<number, string>)[t] ?? '' }
 
 async function handleJoin() {

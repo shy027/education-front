@@ -105,17 +105,23 @@ export const TEACHER_MENUS = [
   { title: '个人中心', icon: 'User', path: '/profile' },
 ]
 
-/** 校领导菜单 = 教师菜单 + 学校管理入口 */
-export const SCHOOL_LEADER_MENUS = [
+export const FRONT_MENUS = [
   { title: '首页', icon: 'House', path: '/home' },
-  { title: '课程管理', icon: 'Reading', path: '/course' },
-  { title: '资源库', icon: 'FolderOpened', path: '/resource' },
-  { title: '课程报告', icon: 'DataLine', path: '/report' },
-  { title: '学校管理', icon: 'OfficeBuilding', path: '/admin/schools' },
-  { title: '内容审核', icon: 'CircleCheckFilled', path: '/admin/audit' },
-  { title: '个人中心', icon: 'User', path: '/profile' },
+  { title: '课程', icon: 'Reading', path: '/course' },
+  { title: '资源', icon: 'FolderOpened', path: '/resource' },
+  { title: '报告', icon: 'DataLine', path: '/report' },
+  { title: '学校', icon: 'OfficeBuilding', path: '/school' }, // 假设有一个展示学校列表的前台页面（可选）
 ]
 
+/** 后台侧边栏：校领导的后台菜单（包含学校相关后台管理） */
+export const SCHOOL_LEADER_MENUS = [
+  { title: '数据看板', icon: 'DataBoard', path: '/admin/dashboard' },
+  { title: '学校管理', icon: 'OfficeBuilding', path: '/admin/schools' },
+  { title: '内容审核', icon: 'CircleCheckFilled', path: '/admin/audit' },
+  { title: '报告管理', icon: 'Document', path: '/admin/reports' },
+]
+
+/** 后台侧边栏：超级管理员的后台菜单（全量） */
 export const ADMIN_MENUS = [
   { title: '数据看板', icon: 'DataBoard', path: '/admin/dashboard' },
   { title: '用户管理', icon: 'UserFilled', path: '/admin/users' },
@@ -124,5 +130,4 @@ export const ADMIN_MENUS = [
   { title: '资源管理', icon: 'FolderOpened', path: '/admin/resources' },
   { title: '报告管理', icon: 'Document', path: '/admin/reports' },
   { title: '学科管理', icon: 'FolderOpened', path: '/admin/subjects' },
-  { title: '个人中心', icon: 'User', path: '/profile' },
 ]

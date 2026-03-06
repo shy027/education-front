@@ -10,7 +10,7 @@
         @click="emit('toggle-sidebar')"
       />
       <el-breadcrumb separator="/" class="breadcrumb">
-        <el-breadcrumb-item :to="{ path: '/home' }">首页</el-breadcrumb-item>
+        <el-breadcrumb-item :to="{ path: '/admin/dashboard' }">后台数据</el-breadcrumb-item>
         <el-breadcrumb-item v-if="currentTitle">{{ currentTitle }}</el-breadcrumb-item>
       </el-breadcrumb>
     </div>
@@ -31,7 +31,8 @@
         </div>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item command="profile" :icon="User">个人中心</el-dropdown-item>
+            <el-dropdown-item command="front" :icon="House">返回前台</el-dropdown-item>
+            <el-dropdown-item command="profile" :icon="User" divided>个人中心</el-dropdown-item>
             <el-dropdown-item divided command="logout" :icon="SwitchButton">退出登录</el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -44,7 +45,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
-import { Fold, Expand, Bell, User, SwitchButton, ArrowDown } from '@element-plus/icons-vue'
+import { Fold, Expand, Bell, User, SwitchButton, ArrowDown, House } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 
@@ -60,6 +61,8 @@ const currentTitle = computed(() => route.meta.title as string | undefined)
 async function handleCommand(cmd: string) {
   if (cmd === 'profile') {
     router.push('/profile')
+  } else if (cmd === 'front') {
+    router.push('/home')
   } else if (cmd === 'logout') {
     await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
       type: 'warning',

@@ -3,7 +3,7 @@
     <!-- 课程头部信息 -->
     <div class="course-hero" v-if="course">
       <div class="hero-cover">
-        <img v-if="course.cover" :src="course.cover" :alt="course.courseName" />
+        <img v-if="course.courseCover" :src="course.courseCover" :alt="course.courseName" />
         <div v-else class="cover-default"><el-icon :size="48" color="rgba(255,255,255,0.7)"><Reading /></el-icon></div>
       </div>
       <div class="hero-info">
@@ -13,7 +13,7 @@
           <el-tag v-if="course.subjectArea" size="small">{{ course.subjectArea }}</el-tag>
         </div>
         <h1 class="hero-title">{{ course.courseName }}</h1>
-        <p class="hero-desc">{{ course.description || '暂无课程介绍' }}</p>
+        <p class="hero-desc">{{ course.courseIntro || '暂无课程介绍' }}</p>
         <div class="hero-meta">
           <span><el-icon><User /></el-icon> {{ course.teacherName }}</span>
           <span><el-icon><UserFilled /></el-icon> {{ course.memberCount }} 人参与</span>
@@ -58,16 +58,24 @@
               </el-button>
             </div>
             <div v-if="chapters.length === 0" class="tree-empty">暂无章节</div>
-            <div
-              v-for="ch in chapters"
-              :key="ch.id"
-              class="chapter-item"
-              :class="{ active: selectedChapterId === ch.id }"
-              @click="selectChapter(ch.id)"
+            <el-tree
+              v-else
+              :data="chapters"
+              :props="{ children: 'children', label: 'chapterName' }"
+              node-key="id"
+              highlight-current
+              :expand-on-click-node="false"
+              default-expand-all
+              @node-click="handleChapterClick"
+              class="custom-chapter-tree"
             >
-              <el-icon><FolderOpened /></el-icon>
-              {{ ch.title }}
-            </div>
+              <template #default="{ data }">
+                <span class="custom-tree-node" :class="{ 'active': selectedChapterId === data.id }">
+                  <el-icon><FolderOpened /></el-icon>
+                  <span>{{ data.chapterName }}</span>
+                </span>
+              </template>
+            </el-tree>
           </div>
 
           <!-- 右：课件列表 -->
@@ -91,7 +99,7 @@
                 <el-icon><component :is="wareIcon(w.wareType)" /></el-icon>
               </div>
               <div class="ware-info">
-                <div class="ware-title">{{ w.title }}</div>
+                <div class="ware-title">{{ w.wareTitle }}</div>
                 <div class="ware-meta">
                   <el-tag size="small" :type="wareAuditType(w.auditStatus)">{{ wareAuditLabel(w.auditStatus) }}</el-tag>
                   <span v-if="w.duration">{{ Math.floor(w.duration / 60) }}min</span>
@@ -101,6 +109,7 @@
                 <el-progress :percentage="w.progress" :stroke-width="4" :show-text="false" color="#d32f2f" style="width:80px" />
                 <span class="progress-text">{{ w.progress }}%</span>
               </div>
+              <el-button v-if="w.allowDownload === 1" text type="primary" size="small" :icon="Download" @click.stop="downloadWare(w)">下载</el-button>
               <el-button v-if="isMyTeaching" text type="danger" size="small" :icon="Delete" @click.stop="deleteWareById(w.id)" />
             </div>
           </div>
@@ -123,7 +132,7 @@
                 {{ { 1: '作业', 2: '考试', 3: '讨论' }[t.taskType] }}
               </div>
               <div class="task-info">
-                <div class="task-name">{{ t.taskName }}</div>
+                <div class="task-name">{{ t.taskTitle }}</div>
                 <div class="task-meta">
                   <span v-if="t.endTime">截止：{{ t.endTime.slice(0, 10) }}</span>
                   <span v-if="t.totalScore">满分：{{ t.totalScore }} 分</span>
@@ -157,14 +166,14 @@
               class="post-item"
               @click="$router.push(`/community/topic/${p.id}`)"
             >
-              <el-avatar :size="36" :src="p.authorAvatar">{{ p.authorName?.charAt(0) }}</el-avatar>
+              <el-avatar :size="36" :src="p.userAvatar">{{ p.userName?.charAt(0) }}</el-avatar>
               <div class="post-content">
                 <div class="post-title">
                   <el-tag v-if="p.isTop" size="small" type="danger" class="top-tag">置顶</el-tag>
                   <el-tag v-if="p.isEssence" size="small" type="warning" class="top-tag">精华</el-tag>
-                  {{ p.title }}
+                  {{ p.postTitle }}
                 </div>
-                <div class="post-meta">{{ p.authorName }} · {{ p.createdTime?.slice(0, 10) }}</div>
+                <div class="post-meta">{{ p.userName }} · {{ p.createdTime?.slice(0, 10) }}</div>
               </div>
               <div class="post-stats">
                 <span><el-icon><ChatDotRound /></el-icon>{{ p.commentCount }}</span>
@@ -224,10 +233,10 @@
     <el-dialog v-model="showCreatePostDialog" title="发布讨论话题" width="520px">
       <el-form :model="postForm" label-width="70px" size="large">
         <el-form-item label="标题" required>
-          <el-input v-model="postForm.title" placeholder="输入话题标题" clearable />
+          <el-input v-model="postForm.postTitle" placeholder="输入话题标题" clearable />
         </el-form-item>
         <el-form-item label="内容">
-          <el-input v-model="postForm.content" type="textarea" :rows="4" placeholder="描述您的讨论内容（选填）" />
+          <el-input v-model="postForm.postContent" type="textarea" :rows="4" placeholder="描述您的讨论内容（选填）" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -254,6 +263,50 @@
         <el-button type="primary" class="red-confirm-btn" :loading="noticeSubmitting" @click="handleCreateNotice">发布</el-button>
       </template>
     </el-dialog>
+
+    <!-- 上传课件对话框 -->
+    <el-dialog v-model="showAddWareDialog" title="上传课件" width="520px" @close="resetWareForm">
+      <el-form :model="wareForm" label-width="80px" size="large">
+        <el-form-item label="标题" required>
+          <el-input v-model="wareForm.wareTitle" placeholder="请输入课件标题" clearable />
+        </el-form-item>
+        <el-form-item label="类型" required>
+          <el-select v-model="wareForm.wareType" placeholder="请选择课件类型" style="width: 100%">
+            <el-option label="视频" :value="1" />
+            <el-option label="文档 (PDF)" :value="2" />
+            <el-option label="PPT" :value="3" />
+            <el-option label="音频" :value="4" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="文件" required>
+          <el-upload
+            class="upload-demo"
+            action="#"
+            :auto-upload="true"
+            :http-request="handleUploadWare"
+            :limit="1"
+            :file-list="wareFileList"
+            :on-remove="() => { wareForm.fileUrl = ''; wareFileList = [] }"
+            accept=".mp4,.pdf,.ppt,.pptx,.mp3"
+          >
+            <el-button type="primary" :loading="uploadingFile">点击选择文件上传</el-button>
+            <template #tip>
+               <div class="el-upload__tip">请确保文件格式与所选类型匹配，不超过100MB</div>
+            </template>
+          </el-upload>
+        </el-form-item>
+        <el-form-item label="允许下载">
+          <el-switch v-model="wareForm.allowDownload" :active-value="1" :inactive-value="0" active-color="#d32f2f" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="wareForm.description" type="textarea" :rows="3" placeholder="课件描述信息" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddWareDialog = false">取消</el-button>
+        <el-button type="primary" class="red-confirm-btn" :loading="wareSubmitting" @click="handleCreateWare">确定上传</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -263,11 +316,11 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Reading, User, UserFilled, Plus, Edit, Delete,
-  FolderOpened, VideoPlay, Document, Headset, ChatDotRound, Star,
+  FolderOpened, VideoPlay, Document, Headset, ChatDotRound, Star, Download
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import {
-  getCourseDetail, getChapterTree, getCoursewareList, createCourseware, deleteCourseware,
+  getCourseDetail, getChapterTree, getChapterCoursewares, getCoursewareList, createCourseware, deleteCourseware, uploadCoursewareFile,
   getTaskList, createTask, deleteTask,
   getAnnouncementList, createAnnouncement, deleteAnnouncement,
   joinCourse, quitCourse, getMyCourses,
@@ -299,7 +352,7 @@ function statusType(s: number): '' | 'info' | 'success' | 'warning' { return ({ 
 function statusLabel(s: number): string { return ({ 0: '暂未开放', 1: '进行中', 2: '已结课' } as Record<number, string>)[s] ?? '未知' }
 
 // ───── 操作处理 ─────
-function joinTypeLabel(t: number): string { return ({ 0: '公开加入', 1: '审批加入', 2: '邀请码' } as Record<number, string>)[t] ?? '' }
+function joinTypeLabel(t: number): string { return ({ 1: '公开加入', 2: '审批加入' } as Record<number, string>)[t] ?? '' }
 
 async function handleJoin() {
   joining.value = true
@@ -340,19 +393,22 @@ const showAddChapterDialog = ref(false)
 const showAddWareDialog = ref(false)
 
 async function fetchChapters() {
-  chapters.value = await getChapterTree(courseId.value)
+  const result = await getChapterTree(courseId.value)
+  chapters.value = result || []
 }
 
 async function fetchWares(chapterId?: string) {
   wareLoading.value = true
   try {
-    const res = await getCoursewareList(courseId.value, { chapterId, pageSize: 50 })
-    wares.value = res.records
+    const res = await getChapterCoursewares(courseId.value as string, chapterId)
+    wares.value = res?.records || []
+  } catch {
+    wares.value = []
   } finally { wareLoading.value = false }
 }
 
-function selectChapter(id: string) {
-  selectedChapterId.value = selectedChapterId.value === id ? undefined : id
+function handleChapterClick(data: ChapterNode) {
+  selectedChapterId.value = selectedChapterId.value === data.id ? undefined : data.id
   fetchWares(selectedChapterId.value)
 }
 
@@ -370,7 +426,13 @@ function wareAuditLabel(status: number): string {
 
 function openWare(w: CoursewareItem) {
   if (w.fileUrl) {
-    window.open(w.fileUrl, '_blank')
+    const isOfficeFile = w.wareType === 3 || w.fileUrl.endsWith('.ppt') || w.fileUrl.endsWith('.pptx') || w.fileUrl.endsWith('.doc') || w.fileUrl.endsWith('.docx') || w.fileUrl.endsWith('.xls') || w.fileUrl.endsWith('.xlsx');
+    if (isOfficeFile && w.fileUrl.startsWith('http')) {
+      // 微软官方的在线文档预览服务（要求文件 URL 是公网可访问的）
+      window.open(`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(w.fileUrl)}`, '_blank')
+    } else {
+      window.open(w.fileUrl, '_blank')
+    }
   }
   // 学生行为埋点：上报观看课件行为
   if (!authStore.isTeacher && !authStore.isAdmin && authStore.userInfo?.userId) {
@@ -384,11 +446,89 @@ function openWare(w: CoursewareItem) {
   }
 }
 
+function downloadWare(w: CoursewareItem) {
+  if (w.fileUrl) {
+    const link = document.createElement('a')
+    let downloadUrl = w.fileUrl
+    // 针对阿里云 OSS URL 强制触发下载
+    if (downloadUrl.includes('aliyuncs.com') && !downloadUrl.includes('response-content-disposition')) {
+      downloadUrl = `${downloadUrl}${downloadUrl.includes('?') ? '&' : '?'}response-content-disposition=attachment`
+    }
+    link.href = downloadUrl
+    link.download = w.wareTitle || 'courseware'
+    link.target = '_blank'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+}
+
 async function deleteWareById(id: string) {
   await ElMessageBox.confirm('确定删除该课件吗？', '提示', { type: 'warning' })
   await deleteCourseware(id)
   wares.value = wares.value.filter((w) => w.id !== id)
   ElMessage.success('已删除')
+}
+
+// ───── 上传课件逻辑 ─────
+const wareSubmitting = ref(false)
+const uploadingFile = ref(false)
+const wareFileList = ref<any[]>([])
+const wareForm = reactive({
+  wareTitle: '',
+  wareType: 2 as 1|2|3|4,
+  allowDownload: 1,
+  description: '',
+  fileUrl: '',
+  fileSize: 0,
+  duration: 0
+})
+
+function resetWareForm() {
+  Object.assign(wareForm, { wareTitle: '', wareType: 2, allowDownload: 1, description: '', fileUrl: '', fileSize: 0, duration: 0 })
+  wareFileList.value = []
+}
+
+async function handleUploadWare(options: any) {
+  const file = options.file
+  if (!file) return
+  
+  const typeMap: Record<number, 'video'|'pdf'|'ppt'|'audio'> = { 1: 'video', 2: 'pdf', 3: 'ppt', 4: 'audio' }
+  const uploadType = typeMap[wareForm.wareType] || 'pdf'
+  
+  uploadingFile.value = true
+  try {
+    const res = await uploadCoursewareFile(uploadType, file)
+    wareForm.fileUrl = res.url
+    wareForm.fileSize = file.size || 0
+    ElMessage.success('文件上传成功')
+  } catch (err: any) {
+    ElMessage.error(err.message || '文件上传失败')
+    wareFileList.value = []
+    wareForm.fileUrl = ''
+  } finally {
+    uploadingFile.value = false
+  }
+}
+
+async function handleCreateWare() {
+  if (!wareForm.wareTitle.trim()) { ElMessage.warning('请输入课件标题'); return }
+  if (!wareForm.fileUrl) { ElMessage.warning('请先上传课件文件'); return }
+  
+  wareSubmitting.value = true
+  try {
+    await createCourseware(courseId.value, { 
+      ...wareForm, 
+      chapterId: selectedChapterId.value 
+    })
+    ElMessage.success('课件上传成功，等待审核或已发布')
+    showAddWareDialog.value = false
+    resetWareForm()
+    fetchWares(selectedChapterId.value)
+    if (course.value) course.value.coursewareCount++
+  } finally { 
+    wareSubmitting.value = false 
+  }
 }
 
 // ───── 任务 ─────
@@ -403,7 +543,7 @@ async function fetchTasks() {
   taskLoading.value = true
   try {
     const res = await getTaskList(courseId.value, { pageSize: 50 })
-    tasks.value = res.records
+    tasks.value = res?.records || []
   } finally { taskLoading.value = false }
 }
 
@@ -420,24 +560,24 @@ const posts = ref<PageResponse<PostItem>>({ records: [], total: 0, pageNum: 1, p
 const postQuery = reactive({ pageNum: 1, pageSize: 10 })
 const showCreatePostDialog = ref(false)
 const postSubmitting = ref(false)
-const postForm = reactive({ title: '', content: '' })
+const postForm = reactive({ postTitle: '', postContent: '' })
 
 async function fetchPosts() {
   postLoading.value = true
   try {
     const res = await getPostList({ courseId: courseId.value, ...postQuery })
-    posts.value = res
+    posts.value = { ...res, records: res?.records || [] }
   } finally { postLoading.value = false }
 }
 
 async function handleCreatePost() {
-  if (!postForm.title.trim()) { ElMessage.warning('请输入话题标题'); return }
+  if (!postForm.postTitle.trim()) { ElMessage.warning('请输入话题标题'); return }
   postSubmitting.value = true
   try {
-    await createPost({ courseId: courseId.value, title: postForm.title, content: postForm.content })
+    await createPost({ courseId: courseId.value, postTitle: postForm.postTitle, postContent: postForm.postContent })
     ElMessage.success('发布成功')
     showCreatePostDialog.value = false
-    Object.assign(postForm, { title: '', content: '' })
+    Object.assign(postForm, { postTitle: '', postContent: '' })
     fetchPosts()
   } finally { postSubmitting.value = false }
 }
@@ -455,7 +595,7 @@ async function fetchAnnouncements() {
   noticeLoading.value = true
   try {
     const res = await getAnnouncementList(courseId.value, { pageSize: 50 })
-    announcements.value = res.records
+    announcements.value = res?.records || []
   } finally { noticeLoading.value = false }
 }
 
@@ -525,14 +665,12 @@ onMounted(async () => {
 }
 
 .hero-cover {
-  width: 280px;
+  width: 320px;
+  height: 180px;
   flex-shrink: 0;
-  min-height: 180px;
-  background: linear-gradient(135deg, #b71c1c, #ff5252);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 .hero-cover img { width: 100%; height: 100%; object-fit: cover; }
 
@@ -605,22 +743,34 @@ onMounted(async () => {
 
 .tree-empty { font-size: 13px; color: #b0bec5; text-align: center; padding: 20px 0; }
 
-.chapter-item {
+.custom-chapter-tree {
+  background: transparent;
+  color: #546e7a;
+}
+:deep(.el-tree-node__content) {
+  height: 36px;
+  border-radius: 6px;
+  margin-bottom: 4px;
+  transition: all 0.2s;
+}
+:deep(.el-tree-node__content:hover) {
+  background: #fff8f8;
+}
+:deep(.el-tree-node.is-current > .el-tree-node__content) {
+  background: #ffebee;
+}
+
+.custom-tree-node {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 10px;
-  border-radius: 8px;
   font-size: 13px;
-  color: #546e7a;
-  cursor: pointer;
-  transition: all 0.2s;
+  width: 100%;
 }
-.chapter-item:hover { background: #fff8f8; color: #d32f2f; }
-.chapter-item.active { background: #ffebee; color: #d32f2f; font-weight: 600; }
-.chapter-item .el-icon { color: #d32f2f; }
+.custom-tree-node.active { color: #d32f2f; font-weight: 600; }
+.custom-tree-node .el-icon { color: #d32f2f; font-size: 14px; }
 
-.ware-list-wrap { flex: 1; }
+.ware-list-wrap { flex: 1; min-width: 0; }
 
 .ware-list-header {
   display: flex;

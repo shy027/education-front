@@ -59,9 +59,8 @@
       <el-form :model="query" inline>
         <el-form-item label="加入方式">
           <el-select v-model="query.joinType" placeholder="不限" clearable style="width: 110px">
-            <el-option label="公开加入" :value="0" />
-            <el-option label="审批加入" :value="1" />
-            <el-option label="邀请码" :value="2" />
+            <el-option label="公开加入" :value="1" />
+            <el-option label="审批加入" :value="2" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
@@ -172,13 +171,9 @@
         </el-form-item>
         <el-form-item label="加入方式" prop="joinType">
           <el-radio-group v-model="createForm.joinType">
-            <el-radio :value="0">公开加入</el-radio>
-            <el-radio :value="1">审批加入</el-radio>
-            <el-radio :value="2">邀请码</el-radio>
+            <el-radio :value="1">公开加入</el-radio>
+            <el-radio :value="2">审批加入</el-radio>
           </el-radio-group>
-        </el-form-item>
-        <el-form-item v-if="createForm.joinType === 2" label="邀请码" prop="inviteCode">
-          <el-input v-model="createForm.inviteCode" placeholder="自定义邀请码（6-12 位）" clearable />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -294,7 +289,7 @@ async function fetchList() {
         joinType: query.joinType,
         status: query.status,
       })
-      courseList.value = res.records
+      courseList.value = res.records || []
       total.value = res.total
     }
   } finally {
@@ -329,6 +324,8 @@ function statusType(c: CourseItem): '' | 'info' | 'success' | 'warning' {
   if (isExpired(c)) return 'warning'
   return ({ 0: 'info', 1: 'success', 2: 'warning' } as Record<number, '' | 'info' | 'success' | 'warning'>)[c.status] ?? ''
 }
+// ───── 操作处理 ─────
+function joinTypeLabel(t: number): string { return ({ 1: '公开加入', 2: '审批加入' } as Record<number, string>)[t] ?? '' }
 function statusLabel(c: CourseItem): string {
   if (isExpired(c)) return '已结课'
   return ({ 0: '暂未开放', 1: '进行中', 2: '已结课' } as Record<number, string>)[c.status] ?? '未知'
@@ -355,8 +352,7 @@ const createForm = reactive<CourseCreateReq>({
   courseName: '',
   description: '',
   subjectArea: '',
-  joinType: 0,
-  inviteCode: '',
+  joinType: 1,
 })
 
 const createRules: FormRules = {
@@ -365,14 +361,10 @@ const createRules: FormRules = {
     { max: 50, message: '课程名称不超过 50 个字符', trigger: 'blur' },
   ],
   joinType: [{ required: true, message: '请选择加入方式', trigger: 'change' }],
-  inviteCode: [
-    { required: true, message: '请设置邀请码', trigger: 'blur' },
-    { min: 6, max: 12, message: '邀请码 6-12 位', trigger: 'blur' },
-  ],
 }
 
 function resetCreateForm() {
-  Object.assign(createForm, { courseName: '', description: '', subjectArea: '', joinType: 0, inviteCode: '' })
+  Object.assign(createForm, { courseName: '', description: '', subjectArea: '', joinType: 1 })
   createFormRef.value?.clearValidate()
 }
 
@@ -383,7 +375,6 @@ async function handleCreate() {
     const courseId = await createCourse({
       ...createForm,
       subjectArea: createForm.subjectArea || undefined,
-      inviteCode: createForm.joinType === 2 ? createForm.inviteCode : undefined,
     })
     ElMessage.success('课程创建成功')
     showCreateDialog.value = false

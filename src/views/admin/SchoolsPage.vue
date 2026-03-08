@@ -108,8 +108,8 @@ async function fetchSchools() {
   loading.value = true
   try {
     const res = await get<PageResponse<SchoolItem>>('/v1/schools', query)
-    schools.value = res.records
-    total.value = res.total
+    schools.value = res?.records || []
+    total.value = res?.total ?? 0
   } finally { loading.value = false }
 }
 

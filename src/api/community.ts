@@ -10,12 +10,13 @@ import type { PageQuery, PageResponse } from '@/types/api'
 export interface PostItem {
   id: string
   courseId: string
-  title: string
-  content?: string
-  authorId: string
-  authorName: string
-  authorAvatar?: string
+  postTitle: string
+  postContent?: string
+  userId: string
+  userName: string
+  userAvatar?: string
   likeCount: number
+  liked?: boolean
   commentCount: number
   isTop: number
   isEssence: number
@@ -25,14 +26,14 @@ export interface PostItem {
 export interface CommentItem {
   id: string
   postId: string
-  content: string
-  authorId: string
-  authorName: string
-  authorAvatar?: string
+  commentContent: string
+  userId: string
+  userName: string
+  userAvatar?: string
   parentId?: string
   likeCount: number
   liked?: boolean
-  children: CommentItem[]
+  replies: CommentItem[]
   createdTime: string
 }
 
@@ -81,10 +82,10 @@ export const getMyPosts = (params?: PageQuery) =>
 export const getPostDetail = (postId: string) =>
   get<PostItem>(`/v1/community/posts/${postId}`)
 
-export const createPost = (data: { courseId: string; title: string; content?: string }) =>
+export const createPost = (data: { courseId: string; postTitle: string; postContent?: string }) =>
   post<PostItem>('/v1/community/posts', data)
 
-export const updatePost = (postId: string, data: { title?: string; content?: string }) =>
+export const updatePost = (postId: string, data: { postTitle?: string; postContent?: string }) =>
   put<void>(`/v1/community/posts/${postId}`, data)
 
 export const deletePost = (postId: string) =>
@@ -101,7 +102,7 @@ export const togglePostEssence = (postId: string, isEssence: number) =>
 export const getCommentList = (params: PageQuery & { postId: string; parentId?: string }) =>
   get<PageResponse<CommentItem>>('/v1/community/comments', params)
 
-export const createComment = (data: { postId: string; content: string; parentId?: string }) =>
+export const createComment = (data: { postId: string; commentContent: string; parentId?: string }) =>
   post<CommentItem>('/v1/community/comments', data)
 
 export const deleteComment = (commentId: string) =>

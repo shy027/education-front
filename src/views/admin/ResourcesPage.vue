@@ -95,8 +95,8 @@ async function fetchResources() {
   loading.value = true
   try {
     const res = await getResourceList(query)
-    resources.value = res.records
-    total.value = res.total
+    resources.value = res?.records || []
+    total.value = res?.total ?? 0
   } finally { loading.value = false }
 }
 

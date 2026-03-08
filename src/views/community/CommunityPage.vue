@@ -54,16 +54,16 @@
           @click="$router.push(`/community/topic/${p.id}`)"
         >
           <div class="post-left">
-            <el-avatar :size="42" :src="p.authorAvatar">{{ p.authorName?.charAt(0) }}</el-avatar>
+            <el-avatar :size="42" :src="p.userAvatar">{{ p.userName?.charAt(0) }}</el-avatar>
           </div>
           <div class="post-main">
             <div class="post-title">
               <el-tag v-if="p.isTop" size="small" type="danger" class="badge">置顶</el-tag>
               <el-tag v-if="p.isEssence" size="small" type="warning" class="badge">精华</el-tag>
-              <span>{{ p.title }}</span>
+              <span>{{ p.postTitle }}</span>
             </div>
             <div class="post-meta">
-              <span>{{ p.authorName }}</span>
+              <span>{{ p.userName }}</span>
               <span>{{ p.createdTime?.slice(0, 10) }}</span>
             </div>
           </div>
@@ -105,10 +105,10 @@
     <el-dialog v-model="showCreateDialog" title="发布讨论话题" width="520px" :close-on-click-modal="false">
       <el-form :model="createForm" label-width="60px" size="large">
         <el-form-item label="标题" required>
-          <el-input v-model="createForm.title" placeholder="请输入话题标题（必填）" clearable maxlength="100" show-word-limit />
+          <el-input v-model="createForm.postTitle" placeholder="请输入话题标题（必填）" clearable maxlength="100" show-word-limit />
         </el-form-item>
         <el-form-item label="内容">
-          <el-input v-model="createForm.content" type="textarea" :rows="5" placeholder="详细描述您的话题（选填）" maxlength="2000" show-word-limit />
+          <el-input v-model="createForm.postContent" type="textarea" :rows="5" placeholder="详细描述您的话题（选填）" maxlength="2000" show-word-limit />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -176,11 +176,12 @@ async function fetchPosts() {
   if (!selectedCourseId.value) return
   loading.value = true
   try {
-    posts.value = await getPostList({
+    const res = await getPostList({
       courseId: selectedCourseId.value,
       keyword: searchKeyword.value || undefined,
       ...query,
     })
+    posts.value = { ...res, records: res?.records || [] }
   } finally { loading.value = false }
 }
 
@@ -192,17 +193,17 @@ function handleSearch() {
 // ───── 发布话题 ─────
 const showCreateDialog = ref(false)
 const creating = ref(false)
-const createForm = reactive({ title: '', content: '' })
+const createForm = reactive({ postTitle: '', postContent: '' })
 
 async function handleCreate() {
-  if (!createForm.title.trim()) { ElMessage.warning('请输入话题标题'); return }
+  if (!createForm.postTitle.trim()) { ElMessage.warning('请输入话题标题'); return }
   if (!selectedCourseId.value) { ElMessage.warning('请先选择课程'); return }
   creating.value = true
   try {
-    await createPost({ courseId: selectedCourseId.value, title: createForm.title, content: createForm.content })
+    await createPost({ courseId: selectedCourseId.value, postTitle: createForm.postTitle, postContent: createForm.postContent })
     ElMessage.success('话题已发布')
     showCreateDialog.value = false
-    Object.assign(createForm, { title: '', content: '' })
+    Object.assign(createForm, { postTitle: '', postContent: '' })
     fetchPosts()
   } finally { creating.value = false }
 }

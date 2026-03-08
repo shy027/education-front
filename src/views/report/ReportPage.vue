@@ -331,7 +331,7 @@ function reportStatusLabel(s: number): string {
 async function fetchReports() {
   try {
     const res = await getCourseReportList(selectedCourseId.value)
-    reports.value = res.records
+    reports.value = res?.records || []
   } catch { /* 静默 */ }
 }
 

@@ -63,22 +63,22 @@ service.interceptors.response.use(
 )
 
 /** GET 请求 */
-export function get<T = unknown>(url: string, params?: Record<string, unknown>, config?: AxiosRequestConfig): Promise<T> {
+export function get<T = unknown>(url: string, params?: any, config?: AxiosRequestConfig): Promise<T> {
   return service.get(url, { params, ...config }) as Promise<T>
 }
 
 /** POST 请求 */
-export function post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+export function post<T = unknown>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
   return service.post(url, data, config) as Promise<T>
 }
 
 /** PUT 请求 */
-export function put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+export function put<T = unknown>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
   return service.put(url, data, config) as Promise<T>
 }
 
 /** DELETE 请求 */
-export function del<T = unknown>(url: string, params?: Record<string, unknown>, config?: AxiosRequestConfig): Promise<T> {
+export function del<T = unknown>(url: string, params?: any, config?: AxiosRequestConfig): Promise<T> {
   return service.delete(url, { params, ...config }) as Promise<T>
 }
 

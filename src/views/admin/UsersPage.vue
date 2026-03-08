@@ -288,7 +288,7 @@ async function fetchList() {
   loading.value = true
   try {
     const res = await getUserList(query)
-    tableData.value = res.records
+    tableData.value = res?.records || []
     total.value = res.total
   } finally {
     loading.value = false

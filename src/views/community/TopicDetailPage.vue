@@ -6,9 +6,9 @@
     <!-- 话题主体 -->
     <div class="topic-card" v-if="post">
       <div class="topic-header">
-        <el-avatar :size="48" :src="post.authorAvatar">{{ post.authorName?.charAt(0) }}</el-avatar>
+        <el-avatar :size="48" :src="post.userAvatar">{{ post.userName?.charAt(0) }}</el-avatar>
         <div class="author-info">
-          <div class="author-name">{{ post.authorName }}</div>
+          <div class="author-name">{{ post.userName }}</div>
           <div class="author-time">{{ post.createdTime?.slice(0, 16) }}</div>
         </div>
         <div class="topic-badges">
@@ -17,8 +17,8 @@
         </div>
       </div>
 
-      <h1 class="topic-title">{{ post.title }}</h1>
-      <div v-if="post.content" class="topic-content">{{ post.content }}</div>
+      <h1 class="topic-title">{{ post.postTitle }}</h1>
+      <div v-if="post.postContent" class="topic-content">{{ post.postContent }}</div>
 
       <div class="topic-actions">
         <el-button
@@ -81,13 +81,13 @@
 
       <div v-else class="comment-list">
         <div v-for="c in comments" :key="c.id" class="comment-item">
-          <el-avatar :size="38" :src="c.authorAvatar">{{ c.authorName?.charAt(0) }}</el-avatar>
+          <el-avatar :size="38" :src="c.userAvatar">{{ c.userName?.charAt(0) }}</el-avatar>
           <div class="comment-body">
             <div class="comment-meta">
-              <span class="comment-author">{{ c.authorName }}</span>
+              <span class="comment-author">{{ c.userName }}</span>
               <span class="comment-time">{{ c.createdTime?.slice(0, 16) }}</span>
             </div>
-            <div class="comment-text">{{ c.content }}</div>
+            <div class="comment-text">{{ c.commentContent }}</div>
             <div class="comment-actions">
               <el-button
                 text
@@ -121,11 +121,11 @@
             </div>
 
             <!-- 子评论 -->
-            <div v-if="c.children?.length" class="sub-comments">
-              <div v-for="sub in c.children" :key="sub.id" class="sub-comment">
-                <el-avatar :size="26" :src="sub.authorAvatar">{{ sub.authorName?.charAt(0) }}</el-avatar>
+            <div v-if="c.replies?.length" class="sub-comments">
+              <div v-for="sub in c.replies" :key="sub.id" class="sub-comment">
+                <el-avatar :size="26" :src="sub.userAvatar">{{ sub.userName?.charAt(0) }}</el-avatar>
                 <div class="sub-body">
-                  <span class="comment-author">{{ sub.authorName }}</span>：{{ sub.content }}
+                  <span class="comment-author">{{ sub.userName }}</span>：{{ sub.commentContent }}
                 </div>
                 <el-button
                   v-if="canDeleteComment(sub)"
@@ -177,6 +177,7 @@ async function fetchPost() {
   pageLoading.value = true
   try {
     post.value = await getPostDetail(postId)
+    liked.value = !!post.value?.liked
   } finally { pageLoading.value = false }
 }
 
@@ -222,8 +223,8 @@ async function fetchComments(reset = false) {
   commentLoading.value = true
   try {
     const res = await getCommentList({ postId, pageNum: commentPage.value, pageSize: PAGE_SIZE })
-    comments.value = [...comments.value, ...res.records]
-    commentTotal.value = res.total
+    comments.value = [...comments.value, ...(res.records || [])]
+    commentTotal.value = res.total ?? 0
   } finally { commentLoading.value = false }
 }
 
@@ -241,10 +242,10 @@ async function handleSubmitComment() {
   if (newComment.value.length > 500) { ElMessage.warning('评论不超过 500 字'); return }
   submitting.value = true
   try {
-    const res = await createComment({ postId, content: newComment.value })
+    const res = await createComment({ postId, commentContent: newComment.value })
     newComment.value = ''
     // 插入到头部
-    comments.value.unshift({ ...res, children: [] })
+    comments.value.unshift({ ...res, replies: [] })
     commentTotal.value++
     if (post.value) post.value.commentCount++
   } finally { submitting.value = false }
@@ -263,9 +264,9 @@ async function submitReply(parent: CommentItem) {
   if (!replyContent.value.trim()) return
   submitting.value = true
   try {
-    const res = await createComment({ postId, content: replyContent.value, parentId: parent.id })
-    if (!parent.children) parent.children = []
-    parent.children.push({ ...res, children: [] })
+    const res = await createComment({ postId, commentContent: replyContent.value, parentId: parent.id })
+    if (!parent.replies) parent.replies = []
+    parent.replies.push({ ...res, replies: [] })
     replyContent.value = ''
     replyingId.value = null
     if (post.value) post.value.commentCount++
@@ -281,7 +282,7 @@ async function handleCommentLike(c: CommentItem) {
 
 // ───── 删除评论 ─────
 function canDeleteComment(c: CommentItem): boolean {
-  return authStore.isTeacher || authStore.isAdmin || c.authorId === authStore.userInfo?.userId
+  return authStore.isTeacher || authStore.isAdmin || c.userId === authStore.userInfo?.userId
 }
 
 async function handleDeleteComment(c: CommentItem) {
@@ -293,8 +294,8 @@ async function handleDeleteComment(c: CommentItem) {
     comments.value.splice(idx, 1)
   } else {
     for (const root of comments.value) {
-      const subIdx = root.children?.findIndex((s) => s.id === c.id) ?? -1
-      if (subIdx !== -1) { root.children.splice(subIdx, 1); break }
+      const subIdx = root.replies?.findIndex((s) => s.id === c.id) ?? -1
+      if (subIdx !== -1) { root.replies.splice(subIdx, 1); break }
     }
   }
   if (post.value) post.value.commentCount = Math.max(0, post.value.commentCount - 1)

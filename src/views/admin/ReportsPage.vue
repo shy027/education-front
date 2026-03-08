@@ -105,8 +105,8 @@ async function fetchReports() {
   loading.value = true
   try {
     const res = await getAllReportList(query)
-    reports.value = res.records
-    total.value = res.total
+    reports.value = res?.records || []
+    total.value = res?.total ?? 0
   } finally { loading.value = false }
 }
 

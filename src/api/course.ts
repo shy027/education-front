@@ -74,14 +74,14 @@ export interface MyCoursesResponse {
 
 export interface ChapterNode {
   id: string
-  title: string
+  chapterName: string
   sortOrder: number
   children: ChapterNode[]
 }
 
 export interface CoursewareItem {
   id: string
-  title: string
+  wareTitle: string
   wareType: number        // 1=视频 2=文档 3=PPT 4=音频
   fileUrl: string
   coverUrl?: string
@@ -94,13 +94,13 @@ export interface CoursewareItem {
 
 export interface TaskItem {
   id: string
-  taskName: string
+  taskTitle: string
   taskType: number        // 1=作业 2=考试 3=讨论
-  description?: string
+  taskDescription?: string
   startTime?: string
   endTime?: string
   totalScore?: number
-  duration?: number
+  durationMinutes?: number
   status: number          // 0=草稿 1=发布 2=结束
   submitCount: number
 }
@@ -166,8 +166,8 @@ export const deleteChapter = (courseId: string, id: string) =>
 export const getCoursewareList = (courseId: string, params?: PageQuery & { chapterId?: string; wareType?: number }) =>
   get<PageResponse<CoursewareItem>>(`/v1/courses/${courseId}/coursewares`, params)
 
-export const getCoursewareDetail = (wareId: string) =>
-  get<CoursewareItem>(`/v1/coursewares/${wareId}`)
+export const getChapterCoursewares = (courseId: string, chapterId?: string, pageNum = 1, pageSize = 100) =>
+  get<PageResponse<CoursewareItem>>(`/v1/courses/${courseId}/coursewares`, { chapterId, pageNum, pageSize })
 
 export const createCourseware = (courseId: string, data: Record<string, unknown>) =>
   post<string>(`/v1/courses/${courseId}/coursewares`, data)

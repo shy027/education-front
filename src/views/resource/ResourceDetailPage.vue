@@ -383,7 +383,7 @@ async function fetchRelated() {
       status: 2,
       pageSize: 6,
     } as ReturnType<typeof Object.assign>)
-    relatedResources.value = res.records.filter((r) => r.id !== resourceId.value)
+    relatedResources.value = (res?.records || []).filter((r) => r.id !== resourceId.value)
   } catch { /* 静默 */ }
   finally { relatedLoading.value = false }
 }

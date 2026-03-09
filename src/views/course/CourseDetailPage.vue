@@ -449,12 +449,7 @@ function openWare(w: CoursewareItem) {
 function downloadWare(w: CoursewareItem) {
   if (w.fileUrl) {
     const link = document.createElement('a')
-    let downloadUrl = w.fileUrl
-    // 针对阿里云 OSS URL 强制触发下载
-    if (downloadUrl.includes('aliyuncs.com') && !downloadUrl.includes('response-content-disposition')) {
-      downloadUrl = `${downloadUrl}${downloadUrl.includes('?') ? '&' : '?'}response-content-disposition=attachment`
-    }
-    link.href = downloadUrl
+    link.href = w.fileUrl
     link.download = w.wareTitle || 'courseware'
     link.target = '_blank'
     document.body.appendChild(link)

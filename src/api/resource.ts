@@ -23,6 +23,15 @@ export interface ResourceItem {
   fileUrl?: string
   content?: string
   createdTime: string
+  attachments?: AttachmentInfo[]
+}
+
+export interface AttachmentInfo {
+  id?: string
+  fileName: string
+  fileUrl: string
+  fileSize: number
+  fileType?: string
 }
 
 export interface ResourceCreateReq {

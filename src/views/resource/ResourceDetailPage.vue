@@ -10,17 +10,26 @@
         <!-- 资源头部info -->
         <div class="resource-hero">
           <div class="hero-left">
-            <!-- 封面 / 视频播放器 -->
+            <!-- 封面 / 媒体预览器 -->
             <div class="media-box" :class="`bg-type-${resource.resourceType}`">
               <!-- 视频播放 -->
               <video
-                v-if="resource.resourceType === 2 && resource.fileUrl"
-                :src="resource.fileUrl"
+                v-if="previewType === 'video' && previewUrl"
+                :key="previewUrl"
+                :src="previewUrl"
                 controls
                 class="video-player"
                 @play="trackView"
               />
-              <!-- 图片封面 -->
+              <!-- 文档预览 (PDF/Office) -->
+              <iframe
+                v-else-if="previewType === 'doc' && previewUrl"
+                :key="previewUrl"
+                :src="previewUrl"
+                class="doc-viewer"
+                frameborder="0"
+              ></iframe>
+              <!-- 图片封面 (文章或无预览文件时) -->
               <img
                 v-else-if="resource.coverUrl"
                 :src="resource.coverUrl"
@@ -78,7 +87,7 @@
             <div class="action-row">
               <!-- 文档/PDF 下载按钮 -->
               <el-button
-                v-if="resource.fileUrl && resource.resourceType !== 2"
+                v-if="currentFile && resource.resourceType !== 2"
                 type="primary"
                 class="red-btn"
                 :icon="Download"
@@ -136,7 +145,7 @@
             <div class="card-header">
               <h3>资源详情</h3>
               <el-button
-                v-if="resource.fileUrl && resource.resourceType === 4"
+                v-if="previewType === 'audio' && previewUrl"
                 type="primary" plain size="small" :icon="Headset"
                 @click="audioPlaying = !audioPlaying"
               >
@@ -146,8 +155,8 @@
           </template>
 
           <!-- 音频播放器 -->
-          <div v-if="resource.resourceType === 4 && resource.fileUrl" class="audio-wrap">
-            <audio ref="audioRef" :src="resource.fileUrl" controls class="audio-player" @play="trackView" />
+          <div v-if="previewType === 'audio' && previewUrl" class="audio-wrap">
+            <audio ref="audioRef" :key="previewUrl" :src="previewUrl" controls class="audio-player" @play="trackView" />
           </div>
 
           <!-- 富文本内容 -->
@@ -156,6 +165,26 @@
             class="resource-content"
             v-html="formattedContent"
           />
+
+          <!-- 附件列表 -->
+          <div v-if="resource.attachments?.length" class="attachments-section">
+            <div class="section-title">资源附件 ({{ resource.attachments.length }})</div>
+            <div class="attachment-list">
+              <div
+                v-for="(file, index) in resource.attachments"
+                :key="file.id"
+                class="attachment-item"
+                :class="{ active: selectedAttachIdx === index }"
+              >
+                <el-icon><Document /></el-icon>
+                <span class="file-name" :title="file.fileName">{{ file.fileName }}</span>
+                <div class="attach-actions">
+                  <el-button type="primary" link @click="selectedAttachIdx = index">在线预览</el-button>
+                  <el-button type="info" link @click="handleFileDownload(file.fileUrl, file.fileName)">下载</el-button>
+                </div>
+              </div>
+            </div>
+          </div>
 
           <!-- 无内容 -->
           <el-empty v-if="!resource.content && resource.resourceType === 1" description="该资源暂无正文内容" :image-size="80" />
@@ -264,6 +293,47 @@ const canEdit = computed(() =>
 function typeIcon(t: number) { return { 1: markRaw(Document), 2: markRaw(VideoPlay), 3: markRaw(Document), 4: markRaw(Headset) }[t] ?? markRaw(Document) }
 function typeLabel(t: number): string { return { 1: '文章', 2: '视频', 3: '文档', 4: '音频' }[t] ?? '资源' }
 
+const selectedAttachIdx = ref(-1) // 初始为 -1，不自动触发预览以防自动下载
+
+const currentFile = computed(() => {
+  if (resource.value?.attachments?.length) {
+    return resource.value.attachments[selectedAttachIdx.value] || resource.value.attachments[0]
+  }
+  return null
+})
+
+const previewUrl = computed(() => {
+  const url = currentFile.value?.fileUrl
+  if (!url) return ''
+
+  // 移除查询参数进行后缀判断
+  const pureUrl = url.split('?')[0].toLowerCase()
+  const isOffice = pureUrl.endsWith('.ppt') || pureUrl.endsWith('.pptx') || 
+                   pureUrl.endsWith('.doc') || pureUrl.endsWith('.docx') || 
+                   pureUrl.endsWith('.xls') || pureUrl.endsWith('.xlsx')
+  
+  if (isOffice && url.startsWith('http')) {
+    // 确保 URL 是全路径且编码
+    return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`
+  }
+  return url
+})
+
+const previewType = computed(() => {
+  const file = currentFile.value
+  if (!file || selectedAttachIdx.value === -1) return 'none'
+  
+  const url = file.fileUrl.toLowerCase()
+  const pureUrl = url.split('?')[0]
+
+  if (pureUrl.endsWith('.mp4') || pureUrl.endsWith('.webm') || pureUrl.endsWith('.ogg')) return 'video'
+  if (pureUrl.endsWith('.mp3') || pureUrl.endsWith('.wav')) return 'audio'
+  if (pureUrl.endsWith('.pdf')) return 'doc'
+  if (previewUrl.value.includes('officeapps.live.com')) return 'doc'
+
+  return 'none'
+})
+
 // 简单格式化：换行转 <br>，支持纯文本
 const formattedContent = computed(() => {
   const c = resource.value?.content ?? ''
@@ -300,14 +370,29 @@ function trackView() {
 
 // ─── 下载 ───
 function handleDownload() {
-  if (!resource.value?.fileUrl) return
-  const a = document.createElement('a')
-  a.href = resource.value.fileUrl
-  a.download = resource.value.title
-  a.target = '_blank'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
+  if (!currentFile.value?.fileUrl) return
+  handleFileDownload(currentFile.value.fileUrl, currentFile.value.fileName || '文件')
+}
+
+function handleFileDownload(url: string, name: string) {
+  // 记录下载行为
+  if (authStore.userInfo?.userId && !authStore.isTeacher && !authStore.isAdmin) {
+    logBehavior({
+      userId: authStore.userInfo.userId,
+      courseId: '0',
+      behaviorType: 'RESOURCE_DOWNLOAD',
+      targetId: resourceId.value,
+    }).catch(() => {})
+  }
+
+  // 构建下载
+  const link = document.createElement('a')
+  link.href = url
+  link.download = name
+  link.target = '_blank'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
 }
 
 // ─── 提交审核 ───
@@ -393,6 +478,12 @@ const audioPlaying = ref(false)
 
 onMounted(async () => {
   await fetchDetail()
+  // 仅视频/音频类资源默认开启预览，文档类保持 -1 等待手动点击，防止自动下载
+  if (resource.value?.attachments?.length) {
+    if (resource.value.resourceType === 2 || resource.value.resourceType === 4) {
+      selectedAttachIdx.value = 0
+    }
+  }
   fetchRelated()
   trackView()
 })
@@ -432,6 +523,7 @@ onMounted(async () => {
 .bg-type-4 { background: linear-gradient(135deg, #e65100, #ffa726); }
 
 .video-player { width: 100%; height: 100%; object-fit: contain; background: #000; }
+.doc-viewer { width: 100%; height: 100%; background: #f5f5f5; border: none; }
 .cover-img { width: 100%; height: 100%; object-fit: cover; }
 .media-fallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
 
@@ -484,13 +576,69 @@ onMounted(async () => {
 .card-header { display: flex; align-items: center; justify-content: space-between; }
 .card-header h3 { margin: 0; font-size: 16px; font-weight: 700; color: #263238; }
 
-.audio-wrap { margin-bottom: 16px; }
-.audio-player { width: 100%; border-radius: 8px; }
+.audio-wrap { margin-bottom: 24px; }
+.audio-player { width: 100%; border-radius: 8px; background: #f5f5f5; }
+
+/* 附件区域 */
+.attachments-section {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px dashed #eee;
+}
+.section-title {
+  margin-bottom: 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+.attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #f9f9f9;
+  border-radius: 8px;
+  transition: all 0.3s;
+}
+.attachment-item.active {
+  background: #fff1f0;
+  border-color: #ffccc7;
+}
+.attachment-item:hover {
+  background: #f0f0f0;
+}
+.attachment-item .file-name {
+  flex: 1;
+  color: #606266;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.attachment-item.active .file-name {
+  color: #d32f2f;
+  font-weight: 600;
+}
+.attach-actions {
+  display: flex;
+  gap: 8px;
+}
+.attachment-item .el-icon {
+  color: #c0c4cc;
+}
 
 .resource-content {
-  font-size: 15px; color: #37474f; line-height: 1.9;
-  white-space: pre-wrap;
+  font-size: 16px;
+  line-height: 1.8;
+  color: #333;
+  min-height: 200px;
 }
+/* 移除多余的 `white-space: pre-wrap;` */
 
 /* ===== 审核记录 ===== */
 .audit-logs-card { border-radius: 14px !important; }

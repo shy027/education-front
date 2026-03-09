@@ -42,6 +42,23 @@
 
       <!-- 筛选区 -->
       <div class="filter-row">
+        <!-- 分类 -->
+        <div class="filter-group">
+          <span class="filter-label">分类：</span>
+          <el-scrollbar class="cate-scroll">
+            <div class="cate-pills">
+              <button class="cate-pill" :class="{ active: !query.categoryId }" @click="selectCategory(undefined)">不限</button>
+              <button
+                v-for="cat in categories"
+                :key="cat.id"
+                class="cate-pill"
+                :class="{ active: query.categoryId === cat.id }"
+                @click="selectCategory(cat.id)"
+              >{{ cat.categoryName }}</button>
+            </div>
+          </el-scrollbar>
+        </div>
+
         <!-- 标签 -->
         <div class="filter-group">
           <span class="filter-label">标签：</span>
@@ -105,10 +122,14 @@
 
           <!-- 信息区 -->
           <div class="card-info">
+            <div class="card-top-meta">
+              <span class="card-creator">{{ r.creatorName }}</span>
+              <span v-if="r.categoryName" class="card-cat-tag">{{ r.categoryName }}</span>
+            </div>
             <h4 class="card-title" :title="r.title">{{ r.title }}</h4>
             <p v-if="r.summary" class="card-summary">{{ r.summary }}</p>
             <div class="card-footer">
-              <span class="card-creator">{{ r.creatorName }}</span>
+              <span class="card-time">{{ r.createdTime?.slice(0, 10) }}</span>
               <span class="card-views">
                 <el-icon><View /></el-icon>{{ r.viewCount }}
               </span>
@@ -153,8 +174,8 @@
 import { ref, reactive, computed, markRaw, onMounted } from 'vue'
 import { Plus, Search, View, VideoPlay, Document, Headset, Reading } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
-import { getResourceList, getEnabledTags } from '@/api/resource'
-import type { ResourceItem, TagItem, ResourceQuery } from '@/api/resource'
+import { getResourceList, getEnabledTags, getCategoryTree } from '@/api/resource'
+import type { ResourceItem, TagItem, ResourceQuery, CategoryNode } from '@/api/resource'
 
 const authStore = useAuthStore()
 
@@ -193,7 +214,7 @@ async function fetchResources() {
   loading.value = true
   try {
     const res = await getResourceList(query)
-    resources.value = res?.records ?? []
+    resources.value = (res as any)?.list ?? res?.records ?? []
     total.value = res?.total ?? 0
   } catch {
     resources.value = []
@@ -203,6 +224,10 @@ async function fetchResources() {
 
 function handleSearch() { query.pageNum = 1; fetchResources() }
 
+// ─── 分类 ───
+const categories = ref<CategoryNode[]>([])
+function selectCategory(id: string | undefined) { query.categoryId = id; query.pageNum = 1; fetchResources() }
+
 // ─── 标签 ───
 const enabledTags = ref<TagItem[]>([])
 function selectTag(id: string | undefined) { query.tagId = id; query.pageNum = 1; fetchResources() }
@@ -211,6 +236,7 @@ onMounted(async () => {
   await Promise.all([
     fetchResources(),
     getEnabledTags().then((r) => { enabledTags.value = r }),
+    getCategoryTree().then((r) => { categories.value = r }),
   ])
 })
 </script>
@@ -392,25 +418,24 @@ onMounted(async () => {
 }
 
 /* 信息区 */
-.card-info { padding: 13px 14px 14px; flex: 1; display: flex; flex-direction: column; }
+.card-info { padding: 14px; flex: 1; display: flex; flex-direction: column; }
+.card-top-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.card-creator { font-size: 13px; color: #78909c; }
+.card-cat-tag { font-size: 11px; padding: 2px 6px; background: #f5f5f5; color: #909399; border-radius: 4px; border: 1px solid #ebeef5; }
 
 .card-title {
-  margin: 0 0 6px;
-  font-size: 14px; font-weight: 700; color: #263238;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-  line-height: 1.45;
+  margin: 0 0 8px; font-size: 16px; font-weight: 700; color: #263238;
+  overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
-
 .card-summary {
-  margin: 0 0 8px;
-  font-size: 12px; color: #90a4ae;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  margin: 0 0 12px; font-size: 13px; color: #607d8b; line-height: 1.5;
+  overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
   flex: 1;
 }
 
-.card-footer { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: #90a4ae; }
-.card-views { display: flex; align-items: center; gap: 3px; }
-
+.card-footer { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #f1f1f1; padding-top: 10px; margin-top: auto; }
+.card-time { font-size: 12px; color: #90a4ae; }
+.card-views { display: flex; align-items: center; gap: 4px; font-size: 13px; color: #78909c; }
 .card-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
 .mini-tag {
   font-size: 11px; padding: 2px 8px;

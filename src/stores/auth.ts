@@ -53,6 +53,10 @@ export const useAuthStore = defineStore('auth', {
     /** 获取当前用户最新信息 */
     async fetchCurrentUser(): Promise<void> {
       const res = await get<CurrentUser>('/v1/auth/current-user')
+      if (res.schools?.[0]) {
+        res.schoolId = res.schools[0].schoolId
+        res.schoolName = res.schools[0].schoolName
+      }
       this.userInfo = res
     },
 

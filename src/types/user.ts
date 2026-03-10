@@ -35,9 +35,16 @@ export interface LoginResponse {
     realName: string
     avatar: string
     roles: UserRole[]
-    schoolId?: string | null
+    schoolId?: string | number | null
     schoolName?: string | null
   }
+}
+
+/** 用户学校信息 */
+export interface UserSchoolInfo {
+  schoolId: string | number
+  schoolName: string
+  memberType: number
 }
 
 /** 当前用户信息 */
@@ -49,9 +56,10 @@ export interface CurrentUser {
   phone: string
   email: string
   roles: UserRole[]
-  schoolId: string | null
+  schoolId: string | number | null
   schoolName: string | null
   status: number
+  schools?: UserSchoolInfo[]
 }
 
 /** 修改个人信息请求 */

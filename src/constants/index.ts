@@ -110,7 +110,7 @@ export const FRONT_MENUS = [
   { title: '课程', icon: 'Reading', path: '/course' },
   { title: '资源', icon: 'FolderOpened', path: '/resource' },
   { title: '报告', icon: 'DataLine', path: '/report' },
-  { title: '学校', icon: 'OfficeBuilding', path: '/school' }, // 假设有一个展示学校列表的前台页面（可选）
+  { title: '院校', icon: 'OfficeBuilding', path: '/schools' },
 ]
 
 /** 后台侧边栏：校领导的后台菜单（包含学校相关后台管理） */

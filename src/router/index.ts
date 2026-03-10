@@ -80,6 +80,20 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '小组详情', hideInMenu: true },
       },
 
+      // 院校中心
+      {
+        path: 'schools',
+        name: 'Schools',
+        component: () => import('@/views/school/SchoolsPage.vue'),
+        meta: { title: '院校中心', icon: 'OfficeBuilding' },
+      },
+      {
+        path: 'schools/:id',
+        name: 'SchoolDetail',
+        component: () => import('@/views/school/SchoolDetailPage.vue'),
+        meta: { title: '学校详情', hideInMenu: true },
+      },
+
       // 资源库
       {
         path: 'resource',

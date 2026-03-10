@@ -321,22 +321,9 @@ async function handlePhoneLogin() {
   if (!(await phoneFormRef.value?.validate().catch(() => false))) return
   loading.value = true
   try {
-    const res = await phoneCodeLogin(phoneForm)
-    // 将 LoginResponse 映射到 store
-    authStore.token = res.token
-    authStore.userInfo = {
-      userId: res.userId,
-      username: res.username,
-      realName: res.realName ?? '',
-      avatar: res.avatar ?? '',
-      phone: phoneForm.phone,
-      email: '',
-      roles: res.roles,
-      schoolId: res.schoolId,
-      schoolName: res.schoolName ?? '',
-      status: 1,
-    }
-    router.replace('/home')
+    await authStore.phoneLogin(phoneForm)
+    const redirect = (route.query.redirect as string) || '/home'
+    router.replace(redirect)
   } finally {
     loading.value = false
   }

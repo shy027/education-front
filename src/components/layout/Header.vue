@@ -64,11 +64,14 @@ async function handleCommand(cmd: string) {
   } else if (cmd === 'front') {
     router.push('/home')
   } else if (cmd === 'logout') {
-    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+    const confirm = await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
       type: 'warning',
       confirmButtonText: '退出',
       cancelButtonText: '取消',
     }).catch(() => null)
+    
+    if (!confirm) return
+    
     authStore.logout()
     router.replace('/login')
   }

@@ -41,22 +41,25 @@ service.interceptors.response.use(
     if (res.code === 200) {
       return res.data as never
     }
-    // 业务错误
-    ElMessage.error(res.message || '操作失败')
+    // 业务错误：若调用方标记静默则不弹窗
+    if (!(response.config as any).skipErrorMsg) {
+      ElMessage.error(res.message || '操作失败')
+    }
     return Promise.reject(new Error(res.message || 'Error'))
   },
   (error) => {
     const status = error.response?.status
     const msg = error.response?.data?.message
+    const skip = (error.config as any)?.skipErrorMsg
 
     if (status === 401) {
       ElMessage.error('登录已过期，请重新登录')
       localStorage.removeItem('edu-auth')
       window.location.hash = '#/login'
     } else if (status === 403) {
-      ElMessage.error('没有权限执行此操作')
+      if (!skip) ElMessage.error('没有权限执行此操作')
     } else {
-      ElMessage.error(msg || error.message || '网络请求失败')
+      if (!skip) ElMessage.error(msg || error.message || '网络请求失败')
     }
     return Promise.reject(error)
   },
@@ -65,6 +68,11 @@ service.interceptors.response.use(
 /** GET 请求 */
 export function get<T = unknown>(url: string, params?: any, config?: AxiosRequestConfig): Promise<T> {
   return service.get(url, { params, ...config }) as Promise<T>
+}
+
+/** GET 请求（静默模式，API 失败时不弹全局 toast） */
+export function silentGet<T = unknown>(url: string, params?: any, config?: AxiosRequestConfig): Promise<T> {
+  return service.get(url, { params, ...config, skipErrorMsg: true } as any) as Promise<T>
 }
 
 /** POST 请求 */

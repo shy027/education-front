@@ -62,6 +62,18 @@
             :loading="joining"
             @click="joinDialogVisible = true"
           >申请加入</el-button>
+
+          <!-- 校领导管理入口（仅所属学校显示） -->
+          <el-button
+            v-if="canManage"
+            type="danger"
+            size="large"
+            class="manage-btn"
+            @click="handleManage"
+          >
+            <el-icon><Setting /></el-icon>
+            管理本校
+          </el-button>
         </div>
       </div>
 
@@ -112,7 +124,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { OfficeBuilding, Location, Check, Warning } from '@element-plus/icons-vue'
+import { OfficeBuilding, Location, Check, Warning, Setting } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { getSchoolDetail, joinSchool } from '@/api/school'
 import type { SchoolItem } from '@/api/school'
@@ -144,6 +156,15 @@ const isJoined = computed(() =>
 
 /** 仅教师且无学校时可申请 */
 const canJoin = computed(() => authStore.isTeacher && !authStore.hasSchool)
+
+/** 仅所属该校的校领导可管理 */
+const canManage = computed(() => 
+  authStore.isSchoolLeader && isJoined.value
+)
+
+function handleManage() {
+  router.push('/admin/schools')
+}
 
 // ── 申请加入 ──
 const joinDialogVisible = ref(false)
@@ -263,11 +284,18 @@ onMounted(fetchDetail)
 }
 
 .join-btn {
-  background: linear-gradient(135deg, #ff5252, #d32f2f) !important;
+  padding: 12px 24px !important;
+}
+
+.manage-btn {
+  background: linear-gradient(135deg, #263238, #455a64) !important;
   border: none !important;
   border-radius: 10px !important;
   font-weight: 700 !important;
   padding: 12px 24px !important;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* ===== 统计卡片 ===== */

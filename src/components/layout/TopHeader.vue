@@ -71,17 +71,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
-// 所有前台用户共享基础的前台导航
-const menus = computed(() => {
-  // 校领导拥有基础内容外加"学校管理"入口
-  if (authStore.isSchoolLeader) {
-    return [
-      ...FRONT_MENUS,
-      { title: '学校管理', path: '/admin/schools' } // 可以在前台直接跳转到后台的学校管理
-    ]
-  }
-  return FRONT_MENUS
-})
+const menus = computed(() => FRONT_MENUS)
 
 /** 判断当前路由是否匹配菜单项（前缀匹配） */
 function isActive(path: string): boolean {
@@ -95,11 +85,14 @@ async function handleCommand(cmd: string) {
   } else if (cmd === 'admin') {
     router.push('/admin/dashboard')
   } else if (cmd === 'logout') {
-    await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+    const confirm = await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
       type: 'warning',
       confirmButtonText: '退出',
       cancelButtonText: '取消',
     }).catch(() => null)
+    
+    if (!confirm) return
+    
     authStore.logout()
     router.replace('/login')
   }

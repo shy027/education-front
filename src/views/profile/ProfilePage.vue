@@ -20,7 +20,17 @@
           </el-upload>
         </div>
         <h3 class="aside-name">{{ userInfo?.realName || userInfo?.username }}</h3>
-        <el-tag class="role-tag" :color="roleColor" size="small">{{ roleLabel }}</el-tag>
+        <div class="role-tags">
+          <el-tag
+            v-for="role in roleLabels"
+            :key="role.label"
+            class="role-tag"
+            :color="role.color"
+            size="small"
+          >
+            {{ role.label }}
+          </el-tag>
+        </div>
         <p class="aside-school">{{ userInfo?.schoolName || '暂无学校信息' }}</p>
       </div>
 
@@ -224,15 +234,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, markRaw, onMounted } from 'vue'
+import { ref, reactive, computed, markRaw, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules, UploadRawFile } from 'element-plus'
 import {
   Camera,
   Lock,
-  ViewGrid,
+  Grid,
   Edit,
-  ShieldLock,
   InfoFilled,
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
@@ -246,29 +255,28 @@ const userInfo = computed(() => authStore.userInfo)
 // ───── 角色显示 ─────
 const ROLE_MAP: Record<string, { label: string; color: string }> = {
   ADMIN: { label: '管理员', color: '#ffebee' },
-  SCHOOL_LEADER: { label: '学校领导', color: '#fff3e0' },
+  SCHOOL_LEADER: { label: '校领导', color: '#fff3e0' },
   TEACHER: { label: '教师', color: '#ffebee' },
   ASSISTANT: { label: '助教', color: '#f3e5f5' },
   STUDENT: { label: '学生', color: '#e8f5e9' },
 }
 
-const roleLabel = computed(() => {
-  const role = userInfo.value?.roles?.[0]
-  return role ? (ROLE_MAP[role]?.label ?? role) : '未知'
+const roleLabels = computed(() => {
+  const roles = userInfo.value?.roles ?? []
+  if (roles.length === 0) return [{ label: '未知', color: '#f5f5f5' }]
+  return roles.map(role => ROLE_MAP[role] || { label: role, color: '#f5f5f5' })
 })
 
-const roleColor = computed(() => {
-  const role = userInfo.value?.roles?.[0]
-  return role ? (ROLE_MAP[role]?.color ?? '#f5f5f5') : '#f5f5f5'
-})
+const roleLabel = computed(() => roleLabels.value[0].label)
+const roleColor = computed(() => roleLabels.value[0].color)
 
 // ───── 导航 ─────
 const currentSection = ref<'overview' | 'edit' | 'security'>('overview')
 
 const navItems = [
-  { key: 'overview', label: '个人概览', icon: markRaw(ViewGrid) },
+  { key: 'overview', label: '个人概览', icon: markRaw(Grid) },
   { key: 'edit', label: '编辑信息', icon: markRaw(Edit) },
-  { key: 'security', label: '账号安全', icon: markRaw(ShieldLock) },
+  { key: 'security', label: '账号安全', icon: markRaw(Lock) },
 ] as const
 
 // ───── 统计（静态占位，后续可接 API） ─────
@@ -279,6 +287,14 @@ const statItems = computed(() => {
       { label: '学生数量', value: '—' },
       { label: '发布任务', value: '—' },
       { label: '研讨主题', value: '—' },
+    ]
+  }
+  if (authStore.isAdmin || authStore.isSchoolLeader) {
+    return [
+      { label: '管理学校', value: '—' },
+      { label: '待办审批', value: '—' },
+      { label: '资源总数', value: '—' },
+      { label: '平台用户', value: '—' },
     ]
   }
   return [
@@ -292,7 +308,15 @@ const statItems = computed(() => {
 // ───── 手机号脱敏 ─────
 function maskPhone(phone?: string): string {
   if (!phone) return '—'
-  return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
+  // 仅对 11 位手机号进行标准脱敏
+  if (phone.length === 11) {
+    return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
+  }
+  // 其它长度简单处理
+  if (phone.length > 4) {
+    return phone.slice(0, 3) + '****' + phone.slice(-2)
+  }
+  return phone
 }
 
 // ───── 头像上传 ─────
@@ -307,7 +331,11 @@ async function handleAvatarUpload(file: UploadRawFile) {
     return false
   }
   try {
-    const res = await uploadAvatar(file, userInfo.value!.userId)
+    if (!userInfo.value?.userId) {
+      ElMessage.error('用户信息异常，请重新登录')
+      return false
+    }
+    const res = await uploadAvatar(file, userInfo.value.userId)
     await updateProfile({ avatar: res.url })
     authStore.userInfo!.avatar = res.url
     ElMessage.success('头像更新成功')
@@ -328,6 +356,7 @@ const profileForm = reactive<UpdateProfileRequest>({
 })
 
 const profileRules: FormRules = {
+  realName: [{ required: true, message: '请输入真实姓名', trigger: 'blur' }],
   email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }],
   phone: [{ pattern: /^(1[3-9]\d{9})?$/, message: '手机号格式不正确', trigger: 'blur' }],
 }
@@ -395,7 +424,7 @@ async function handleChangePwd() {
     // 自动退出并跳转登录
     setTimeout(() => {
       authStore.logout()
-      window.location.hash = '#/login'
+      router.replace('/login')
     }, 1500)
   } finally {
     pwdLoading.value = false
@@ -410,7 +439,22 @@ const securityTips = [
   '操作记录将保留 12 个月，便于合规追溯',
 ]
 
-onMounted(resetProfileForm)
+// ───── 生命周期与数据同步 ─────
+onMounted(async () => {
+  try {
+    await authStore.fetchCurrentUser()
+    resetProfileForm()
+  } catch (err) {
+    console.error('Failed to fetch user info:', err)
+  }
+})
+
+// 当用户信息更新时同步表单
+watch(() => userInfo.value, () => {
+  if (currentSection.value === 'overview') {
+    resetProfileForm()
+  }
+}, { deep: true })
 </script>
 
 <style scoped>
@@ -482,6 +526,14 @@ onMounted(resetProfileForm)
   font-size: 12px;
   color: rgba(255, 255, 255, 0.75);
   text-align: center;
+}
+
+.role-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 4px;
 }
 
 .aside-nav {

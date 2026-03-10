@@ -2,7 +2,7 @@
  * 报告 & 画像服务 API
  * 后端路由前缀：/api/v1
  */
-import { get, post, put } from '@/utils/request'
+import { get, post, put, silentGet } from '@/utils/request'
 import type { PageQuery, PageResponse } from '@/types/api'
 
 // ===================== 类型定义 =====================
@@ -40,16 +40,16 @@ export interface StatisticsResponse {
 }
 
 export interface ReportDTO {
-  id: string
-  courseId: string
-  courseName: string
-  reportType: number            // 1=课程报告 2=学校报告
-  status: number                // 0=等待 1=生成中 2=完成 3=失败
-  generatorId: string
+  id: string | number
+  courseId: string | number
+  reportTitle: string        // 报告标题
+  fileUrl?: string           // 文件 URL（有则可直接下载）
+  reportType: number         // 1=课程报告 2=学校报告
+  generatorId: string | number
   generatorName: string
-  createdTime: string
-  finishedTime?: string
+  generateTime?: string      // 生成完成时间
   downloadCount: number
+  createdTime?: string       // 创建时间（兼容）
 }
 
 export interface ReportStatusResponse {
@@ -75,22 +75,22 @@ export interface BehaviorLogReq {
 export const logBehavior = (data: BehaviorLogReq) =>
   post<void>('/v1/behaviors/log', data)
 
-// ===================== 素养画像 =====================
+// ===================== 素养画像（静默模式，无数据时不弹窗）=====================
 
 export const getMyProfile = (courseId: string) =>
-  get<ProfileResponse>('/v1/profiles/my', { courseId })
+  silentGet<ProfileResponse>('/v1/profiles/my', { courseId })
 
 export const getUserProfile = (userId: string, courseId: string) =>
-  get<ProfileResponse>(`/v1/profiles/${userId}`, { courseId })
+  silentGet<ProfileResponse>(`/v1/profiles/${userId}`, { courseId })
 
 export const getRadarData = (courseId: string) =>
-  get<RadarDataResponse>('/v1/profiles/radar', { courseId })
+  silentGet<RadarDataResponse>('/v1/profiles/radar', { courseId })
 
 export const getGrowthTrack = (courseId: string, days = 30) =>
-  get<GrowthTrackResponse>('/v1/profiles/growth-track', { courseId, days })
+  silentGet<GrowthTrackResponse>('/v1/profiles/growth-track', { courseId, days })
 
 export const getLearningStatistics = (courseId: string, days = 30) =>
-  get<StatisticsResponse>('/v1/profiles/statistics', { courseId, days })
+  silentGet<StatisticsResponse>('/v1/profiles/statistics', { courseId, days })
 
 export const calculateMyProfile = (courseId: string) =>
   post<void>('/v1/profiles/calculate/user', null, { params: { courseId } })
@@ -101,16 +101,16 @@ export const generateCourseReport = (courseId: string) =>
   post<string>(`/v1/reports/course/${courseId}/generate`)
 
 export const getReportStatus = (reportId: string) =>
-  get<ReportStatusResponse>(`/v1/reports/${reportId}/status`)
+  silentGet<ReportStatusResponse>(`/v1/reports/${reportId}/status`)
 
 export const getReportDownloadUrl = (reportId: string) =>
   get<string>(`/v1/reports/${reportId}/download`)
 
 export const getCourseReportList = (courseId: string, params?: PageQuery) =>
-  get<PageResponse<ReportDTO>>(`/v1/reports/course/${courseId}`, params)
+  silentGet<PageResponse<ReportDTO>>(`/v1/reports/course/${courseId}`, params)
 
 export const getAllReportList = (params?: PageQuery & { courseId?: string; reportType?: number; startTime?: string; endTime?: string }) =>
-  get<PageResponse<ReportDTO>>('/v1/reports', params)
+  silentGet<PageResponse<ReportDTO>>('/v1/reports', params)
 
 export const deleteReport = (reportId: string) =>
   import('@/utils/request').then(m => m.del<void>(`/v1/reports/${reportId}`))

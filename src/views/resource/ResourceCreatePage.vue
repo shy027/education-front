@@ -231,7 +231,7 @@ async function handleCoverUpload(file: UploadRawFile) {
   if (file.size > 5 * 1024 * 1024) { ElMessage.error('封面图不超过 5MB'); return false }
   try {
     const res = await uploadResourceImage(file)
-    form.coverUrl = res.url
+    form.coverUrl = res.fileUrl
   } catch { /* 统一处理 */ }
   return false
 }
@@ -243,13 +243,13 @@ async function handleFileUpload(file: UploadRawFile) {
     let url = ''
     if (form.resourceType === 2) {
       const res = await uploadResourceVideo(file)
-      url = res.url
+      url = res.fileUrl
     } else if (form.resourceType === 4) {
       const res = await uploadResourceVideo(file)   // 音频复用 video 接口或专用接口
-      url = res.url
+      url = res.fileUrl
     } else {
       const res = await uploadResourcePdf(file)
-      url = res.url
+      url = res.fileUrl
     }
     form.fileUrl = url
     uploadProgress.value = 100

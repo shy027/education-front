@@ -8,7 +8,7 @@
       </div>
       <div class="hero-info">
         <div class="hero-badges">
-          <el-tag size="small" :type="statusType(course.status)">{{ statusLabel(course.status) }}</el-tag>
+          <el-tag size="small" :type="statusType(course)">{{ statusLabel(course) }}</el-tag>
           <el-tag size="small" type="info">{{ joinTypeLabel(course.joinType) }}</el-tag>
           <el-tag v-if="course.subjectArea" size="small">{{ course.subjectArea }}</el-tag>
         </div>
@@ -16,27 +16,27 @@
         <p class="hero-desc">{{ course.courseIntro || '暂无课程介绍' }}</p>
         <div class="hero-meta">
           <span><el-icon><User /></el-icon> {{ course.teacherName }}</span>
-          <span><el-icon><UserFilled /></el-icon> {{ course.memberCount }} 人参与</span>
+          <span><el-icon><UserFilled /></el-icon> {{ course.studentCount ?? course.memberCount ?? 0 }} 人参与</span>
         </div>
         <!-- 操作区 -->
         <div class="hero-actions">
           <!-- 加入/退出：仅学生可见，教师（无论是否是该课程创建者）均不显示 -->
           <el-button
-            v-if="!authStore.isTeacher && !authStore.isAdmin && !isMember"
+            v-if="!authStore.isTeacher && !authStore.isAdmin && !isMember && !isCourseFinished"
             type="primary"
             class="join-btn"
             :loading="joining"
             @click="handleJoin"
           >加入课程</el-button>
           <el-button
-            v-if="!authStore.isTeacher && !authStore.isAdmin && isMember"
+            v-if="!authStore.isTeacher && !authStore.isAdmin && isMember && !isCourseFinished"
             type="danger"
             plain
             :loading="quitting"
             @click="handleQuit"
           >退出课程</el-button>
           <el-button
-            v-if="authStore.isTeacher && isMyTeaching"
+            v-if="authStore.isTeacher && isMyTeaching && !isCourseFinished"
             :icon="Edit"
             @click="showEditDialog = true"
           >编辑课程</el-button>
@@ -53,7 +53,7 @@
           <div class="chapter-tree">
             <div class="tree-header">
               章节目录
-              <el-button v-if="isMyTeaching" text :icon="Plus" size="small" @click="showAddChapterDialog = true">
+              <el-button v-if="isMyTeaching && !isCourseFinished" text :icon="Plus" size="small" @click="showAddChapterDialog = true">
                 添加章节
               </el-button>
             </div>
@@ -82,7 +82,7 @@
           <div class="ware-list-wrap">
             <div class="ware-list-header">
               <span>{{ selectedChapterId ? '课件列表' : '全部课件' }}</span>
-              <el-button v-if="isMyTeaching" type="primary" size="small" :icon="Plus" class="red-sm-btn" @click="showAddWareDialog = true">
+              <el-button v-if="isMyTeaching && !isCourseFinished" type="primary" size="small" :icon="Plus" class="red-sm-btn" @click="showAddWareDialog = true">
                 上传课件
               </el-button>
             </div>
@@ -109,8 +109,8 @@
                 <el-progress :percentage="w.progress" :stroke-width="4" :show-text="false" color="#d32f2f" style="width:80px" />
                 <span class="progress-text">{{ w.progress }}%</span>
               </div>
-              <el-button v-if="w.allowDownload === 1" text type="primary" size="small" :icon="Download" @click.stop="downloadWare(w)">下载</el-button>
-              <el-button v-if="isMyTeaching" text type="danger" size="small" :icon="Delete" @click.stop="deleteWareById(w.id)" />
+              <el-button v-if="w.allowDownload === 1 && canInteract" text type="primary" size="small" :icon="Download" @click.stop="downloadWare(w)">下载</el-button>
+              <el-button v-if="isMyTeaching && !isCourseFinished" text type="danger" size="small" :icon="Delete" @click.stop="deleteWareById(w.id)" />
             </div>
           </div>
         </div>
@@ -121,7 +121,7 @@
         <div v-loading="taskLoading">
           <div class="tab-toolbar">
             <span class="toolbar-total">共 {{ tasks.length }} 项任务</span>
-            <el-button v-if="isMyTeaching" type="primary" :icon="Plus" size="small" class="red-sm-btn" @click="showCreateTaskDialog = true">
+            <el-button v-if="isMyTeaching && !isCourseFinished" type="primary" :icon="Plus" size="small" class="red-sm-btn" @click="showCreateTaskDialog = true">
               创建任务
             </el-button>
           </div>
@@ -129,7 +129,7 @@
           <div class="task-list">
             <div v-for="t in tasks" :key="t.id" class="task-item">
               <div class="task-type-icon" :class="`task-type-${t.taskType}`">
-                {{ { 1: '作业', 2: '考试', 3: '讨论' }[t.taskType] }}
+                {{ { 1: '作业', 2: '测验', 3: '考试' }[t.taskType] }}
               </div>
               <div class="task-info">
                 <div class="task-name">{{ t.taskTitle }}</div>
@@ -141,7 +141,7 @@
               </div>
               <div class="task-actions">
                 <el-tag v-if="!isMyTeaching" size="small">{{ t.submitCount }} 人参与</el-tag>
-                <el-button v-if="isMyTeaching" text type="danger" size="small" @click="deleteTaskById(t.id)">删除</el-button>
+                <el-button v-if="isMyTeaching && !isCourseFinished" text type="danger" size="small" @click="deleteTaskById(t.id)">删除</el-button>
               </div>
             </div>
           </div>
@@ -154,7 +154,7 @@
           <div class="tab-toolbar">
             <span class="toolbar-total">共 {{ posts.total }} 个话题</span>
             <!-- 仅教师可发布话题（API规定 POST /posts 需要 TEACHER 权限） -->
-            <el-button v-if="isMyTeaching" type="primary" :icon="Plus" size="small" class="red-sm-btn" @click="showCreatePostDialog = true">
+            <el-button v-if="isMyTeaching && !isCourseFinished" type="primary" :icon="Plus" size="small" class="red-sm-btn" @click="showCreatePostDialog = true">
               发布话题
             </el-button>
           </div>
@@ -164,7 +164,7 @@
               v-for="p in posts.records"
               :key="p.id"
               class="post-item"
-              @click="$router.push(`/community/topic/${p.id}`)"
+              @click="handlePostClick(String(p.id))"
             >
               <el-avatar :size="36" :src="p.userAvatar">{{ p.userName?.charAt(0) }}</el-avatar>
               <div class="post-content">
@@ -199,7 +199,7 @@
         <div v-loading="noticeLoading">
           <div class="tab-toolbar">
             <span />
-            <el-button v-if="isMyTeaching" type="primary" :icon="Plus" size="small" class="red-sm-btn" @click="showCreateNoticeDialog = true">
+            <el-button v-if="isMyTeaching && !isCourseFinished" type="primary" :icon="Plus" size="small" class="red-sm-btn" @click="showCreateNoticeDialog = true">
               发布公告
             </el-button>
           </div>
@@ -225,7 +225,7 @@
       <div class="notice-full-content" v-html="selectedNotice?.content?.replace(/\n/g, '<br/>')" />
       <template #footer>
         <el-button @click="noticeDialogVisible = false">关闭</el-button>
-        <el-button v-if="isMyTeaching" type="danger" plain @click="deleteNoticeById(selectedNotice!.id)">删除</el-button>
+        <el-button v-if="isMyTeaching && !isCourseFinished" type="danger" plain @click="deleteNoticeById(selectedNotice!.id)">删除</el-button>
       </template>
     </el-dialog>
 
@@ -267,6 +267,19 @@
     <!-- 上传课件对话框 -->
     <el-dialog v-model="showAddWareDialog" title="上传课件" width="520px" @close="resetWareForm">
       <el-form :model="wareForm" label-width="80px" size="large">
+        <el-form-item label="所属章节">
+          <el-select v-model="wareForm.chapterId" placeholder="选择章节 (可选)" clearable style="width: 100%">
+            <!-- 如果为了可以选一级，也可以把一级自己放在外面，但用 el-option-group 比较直观 -->
+            <template v-for="c in chapters" :key="c.id">
+              <el-option-group v-if="c.children && c.children.length > 0" :label="c.chapterName">
+                <!-- 允许选父级 -->
+                <el-option :label="`${c.chapterName} (本章)`" :value="c.id" />
+                <el-option v-for="sub in c.children" :key="sub.id" :label="sub.chapterName" :value="sub.id" />
+              </el-option-group>
+              <el-option v-else :label="c.chapterName" :value="c.id" />
+            </template>
+          </el-select>
+        </el-form-item>
         <el-form-item label="标题" required>
           <el-input v-model="wareForm.wareTitle" placeholder="请输入课件标题" clearable />
         </el-form-item>
@@ -307,6 +320,118 @@
         <el-button type="primary" class="red-confirm-btn" :loading="wareSubmitting" @click="handleCreateWare">确定上传</el-button>
       </template>
     </el-dialog>
+
+    <!-- 编辑课程基本信息对话框 -->
+    <el-dialog v-model="showEditDialog" title="编辑课程" width="520px" @open="initEditForm">
+      <el-form :model="editForm" label-width="90px" size="large">
+        <el-form-item label="课程名称" required>
+          <el-input v-model="editForm.courseName" placeholder="课程名称" clearable maxlength="50" show-word-limit />
+        </el-form-item>
+        <el-form-item label="课程简介">
+          <el-input v-model="editForm.courseIntro" type="textarea" :rows="3" placeholder="课程简介" />
+        </el-form-item>
+        <el-form-item label="课程封面">
+          <el-upload
+            class="cover-uploader"
+            :show-file-list="false"
+            :http-request="handleUploadCover"
+            accept="image/*"
+            :disabled="coverUploading"
+          >
+            <div v-if="editForm.courseCover" class="cover-preview">
+              <img :src="editForm.courseCover" class="cover-image" />
+              <div class="cover-edit-mask">
+                <el-icon><Edit /></el-icon>
+              </div>
+            </div>
+            <div v-else class="cover-placeholder" v-loading="coverUploading">
+              <el-icon class="cover-uploader-icon"><Plus /></el-icon>
+            </div>
+          </el-upload>
+        </el-form-item>
+        <el-form-item label="加入方式">
+          <el-radio-group v-model="editForm.joinType">
+            <el-radio :value="1">公开加入</el-radio>
+            <el-radio :value="2">审批加入</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="开课/结课时间" v-if="editForm.startTime || editForm.endTime">
+          <span style="color: #909399; font-size: 13px;">
+            {{ editForm.startTime || '未设置' }} 至 {{ editForm.endTime || '不限' }}
+            (不可修改)
+          </span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showEditDialog = false">取消</el-button>
+        <el-button type="primary" class="red-confirm-btn" :loading="editSubmitting" @click="handleEditCourse">保存设置</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 添加章节对话框 -->
+    <el-dialog v-model="showAddChapterDialog" title="添加章节" width="400px" @closed="resetChapterForm">
+      <el-form :model="chapterForm" label-width="80px" size="large" @submit.prevent="handleCreateChapter">
+        <el-form-item label="父级章节">
+          <el-select v-model="chapterForm.parentId" placeholder="作为一级章节 (默认)" clearable style="width: 100%">
+            <el-option label="-- 作为一级章节 --" value="" />
+            <el-option v-for="c in chapters" :key="c.id" :label="c.chapterName" :value="c.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="标题" required>
+          <el-input v-model="chapterForm.chapterName" placeholder="输入章节标题" clearable />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showAddChapterDialog = false">取消</el-button>
+        <el-button type="primary" class="red-confirm-btn" :loading="chapterSubmitting" @click="handleCreateChapter">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 创建任务对话框 -->
+    <el-dialog v-model="showCreateTaskDialog" title="创建学习任务" width="520px" @closed="resetTaskForm">
+      <el-form :model="taskForm" label-width="80px" size="large">
+        <el-form-item label="任务名称" required>
+          <el-input v-model="taskForm.taskTitle" placeholder="如：第一章课后测试" clearable />
+        </el-form-item>
+        <el-form-item label="任务类型" required>
+          <el-select v-model="taskForm.taskType" placeholder="选择任务类型" style="width: 100%">
+            <el-option label="作业" :value="1" />
+            <el-option label="测验" :value="2" />
+            <el-option label="考试" :value="3" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="满分设置">
+          <el-input-number v-model="taskForm.totalScore" :min="0" :max="100" />
+        </el-form-item>
+        <template v-if="taskForm.taskType !== 1">
+          <el-form-item label="开始时间" required>
+            <el-date-picker
+              v-model="taskForm.startTime"
+              type="datetime"
+              placeholder="选择测试/考试开始时间"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="截止时间" required>
+            <el-date-picker
+              v-model="taskForm.endTime"
+              type="datetime"
+              placeholder="选择测试/考试截止时间"
+              value-format="YYYY-MM-DD HH:mm:ss"
+              style="width: 100%"
+            />
+          </el-form-item>
+        </template>
+        <el-form-item label="任务说明">
+          <el-input v-model="taskForm.taskDescription" type="textarea" :rows="3" placeholder="填写要求或注意事项" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showCreateTaskDialog = false">取消</el-button>
+        <el-button type="primary" class="red-confirm-btn" :loading="taskSubmitting" @click="handleCreateTask">发布任务</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -320,7 +445,7 @@ import {
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import {
-  getCourseDetail, getChapterTree, getChapterCoursewares, getCoursewareList, createCourseware, deleteCourseware, uploadCoursewareFile,
+  getCourseDetail, updateCourse, getChapterTree, createChapter, getChapterCoursewares, getCoursewareList, createCourseware, deleteCourseware, uploadCoursewareFile,
   getTaskList, createTask, deleteTask,
   getAnnouncementList, createAnnouncement, deleteAnnouncement,
   joinCourse, quitCourse, getMyCourses,
@@ -345,11 +470,47 @@ const quitting = ref(false)
 const showEditDialog = ref(false)
 
 const isMyTeaching = computed(() =>
-  authStore.isTeacher && course.value?.teacherId === authStore.userInfo?.userId,
+  authStore.isTeacher && String(course.value?.teacherId) === String(authStore.userInfo?.userId),
 )
 
-function statusType(s: number): '' | 'info' | 'success' | 'warning' { return ({ 0: 'info', 1: 'success', 2: 'warning' } as Record<number, '' | 'info' | 'success' | 'warning'>)[s] ?? '' }
-function statusLabel(s: number): string { return ({ 0: '暂未开放', 1: '进行中', 2: '已结课' } as Record<number, string>)[s] ?? '未知' }
+const isCourseFinished = computed(() => {
+  if (!course.value) return false
+  return getCalculatedStatus(course.value) === 'finished'
+})
+
+const canInteract = computed(() => {
+  if (isCourseFinished.value) return false
+  if (authStore.isAdmin) return true
+  if (authStore.isTeacher && isMyTeaching.value) return true
+  if (!authStore.isTeacher && !authStore.isAdmin && isMember.value) return true
+  return false
+})
+
+function getCalculatedStatus(c: CourseItem): 'audit' | 'notStarted' | 'ongoing' | 'finished' {
+  if (c.auditStatus === 0) return 'audit'
+  const now = new Date()
+  if (c.startTime && new Date(c.startTime) > now) return 'notStarted'
+  if (c.endTime && new Date(c.endTime) < now) return 'finished'
+  return 'ongoing'
+}
+
+function statusType(c: CourseItem): '' | 'info' | 'success' | 'warning' | 'danger' {
+  const s = getCalculatedStatus(c)
+  if (s === 'audit') return 'warning'
+  if (s === 'notStarted') return 'info'
+  if (s === 'ongoing') return 'success'
+  if (s === 'finished') return 'info'
+  return ''
+}
+
+function statusLabel(c: CourseItem): string {
+  const s = getCalculatedStatus(c)
+  if (s === 'audit') return '审核中'
+  if (s === 'notStarted') return '暂未开放'
+  if (s === 'ongoing') return '进行中'
+  if (s === 'finished') return '已结课'
+  return '未知'
+}
 
 // ───── 操作处理 ─────
 function joinTypeLabel(t: number): string { return ({ 1: '公开加入', 2: '审批加入' } as Record<number, string>)[t] ?? '' }
@@ -360,7 +521,10 @@ async function handleJoin() {
     await joinCourse(courseId.value)
     isMember.value = true
     ElMessage.success('加入成功！')
-    if (course.value) course.value.memberCount++
+    if (course.value) {
+      course.value.studentCount = (course.value.studentCount ?? course.value.memberCount ?? 0) + 1
+      course.value.memberCount = course.value.studentCount
+    }
   } finally { joining.value = false }
 }
 
@@ -371,8 +535,74 @@ async function handleQuit() {
     await quitCourse(courseId.value)
     isMember.value = false
     ElMessage.success('已退出课程')
-    if (course.value) course.value.memberCount--
+    if (course.value) {
+      course.value.studentCount = Math.max(0, (course.value.studentCount ?? course.value.memberCount ?? 1) - 1)
+      course.value.memberCount = course.value.studentCount
+    }
   } finally { quitting.value = false }
+}
+
+// ───── 课程基本信息编辑 ─────
+const editSubmitting = ref(false)
+const editForm = reactive({
+  courseName: '',
+  courseIntro: '',
+  courseCover: '',
+  joinType: 1,
+  startTime: '',
+  endTime: '',
+})
+
+function initEditForm() {
+  if (course.value) {
+    Object.assign(editForm, {
+      courseName: course.value.courseName || '',
+      courseIntro: course.value.courseIntro || course.value.description || '', // 后端 CourseDetailResponse 实际返回的是 courseIntro
+      courseCover: course.value.courseCover || course.value.cover || '',
+      joinType: course.value.joinType || 1,
+      startTime: course.value.startTime || '',
+      endTime: course.value.endTime || '',
+    })
+  }
+}
+
+const coverUploading = ref(false)
+
+async function handleUploadCover(options: any) {
+  coverUploading.value = true
+  try {
+    const res = await uploadCoursewareFile('cover', options.file)
+    // 根据 FileUploadResult 接口，返回的值包含 fileUrl
+    editForm.courseCover = (res as any).fileUrl || (res as any).url || res || ''
+    ElMessage.success('封面上传成功')
+  } catch (err: any) {
+    ElMessage.error(err.message || '封面上传失败')
+  } finally {
+    coverUploading.value = false
+  }
+}
+
+async function handleEditCourse() {
+  if (!editForm.courseName.trim()) { ElMessage.warning('课程名称不能为空'); return }
+  if (!editForm.startTime) { ElMessage.warning('开课时间不能为空'); return }
+  
+  editSubmitting.value = true
+  try {
+    await updateCourse({
+      id: courseId.value,
+      courseName: editForm.courseName,
+      courseIntro: editForm.courseIntro, 
+      courseCover: editForm.courseCover,
+      joinType: editForm.joinType,
+      schoolId: authStore.userInfo?.schoolId ?? undefined
+    })
+    ElMessage.success('保存成功')
+    showEditDialog.value = false
+    // 刷新展示
+    course.value = await getCourseDetail(courseId.value)
+  } finally {
+    editSubmitting.value = false
+  }
 }
 
 // ───── Tab ─────
@@ -412,16 +642,43 @@ function handleChapterClick(data: ChapterNode) {
   fetchWares(selectedChapterId.value)
 }
 
+const chapterForm = reactive({
+  chapterName: '',
+  parentId: ''
+})
+const chapterSubmitting = ref(false)
+
+function resetChapterForm() {
+  Object.assign(chapterForm, { chapterName: '', parentId: '' })
+}
+
+async function handleCreateChapter() {
+  if (!chapterForm.chapterName.trim()) { ElMessage.warning('章节标题不能为空'); return }
+  chapterSubmitting.value = true
+  try {
+    const payload: any = { chapterName: chapterForm.chapterName }
+    if (chapterForm.parentId) payload.parentId = chapterForm.parentId
+    
+    await createChapter(courseId.value, payload)
+    ElMessage.success('章节添加成功')
+    showAddChapterDialog.value = false
+    resetChapterForm()
+    fetchChapters()
+  } finally {
+    chapterSubmitting.value = false
+  }
+}
+
 function wareIcon(type: number) {
   return { 1: markRaw(VideoPlay), 2: markRaw(Document), 3: markRaw(Document), 4: markRaw(Headset) }[type] ?? markRaw(Document)
 }
 
 function wareAuditType(status: number): '' | 'info' | 'success' | 'warning' | 'danger' {
-  return ({ 0: 'info', 1: 'warning', 2: 'success', 3: 'danger' } as Record<number, '' | 'info' | 'success' | 'warning' | 'danger'>)[status] ?? 'info'
+  return ({ 0: 'warning', 1: 'success', 2: 'danger' } as Record<number, '' | 'info' | 'success' | 'warning' | 'danger'>)[status] ?? 'info'
 }
 
 function wareAuditLabel(status: number): string {
-  return ({ 0: '未提审', 1: '待审核', 2: '已通过', 3: '已拒绝' } as Record<number, string>)[status] ?? '—'
+  return ({ 0: '待审核', 1: '已通过', 2: '已拒绝' } as Record<number, string>)[status] ?? '—'
 }
 
 function openWare(w: CoursewareItem) {
@@ -476,11 +733,12 @@ const wareForm = reactive({
   description: '',
   fileUrl: '',
   fileSize: 0,
-  duration: 0
+  duration: 0,
+  chapterId: '' as string | undefined
 })
 
 function resetWareForm() {
-  Object.assign(wareForm, { wareTitle: '', wareType: 2, allowDownload: 1, description: '', fileUrl: '', fileSize: 0, duration: 0 })
+  Object.assign(wareForm, { wareTitle: '', wareType: 2, allowDownload: 1, description: '', fileUrl: '', fileSize: 0, duration: 0, chapterId: undefined })
   wareFileList.value = []
 }
 
@@ -494,7 +752,7 @@ async function handleUploadWare(options: any) {
   uploadingFile.value = true
   try {
     const res = await uploadCoursewareFile(uploadType, file)
-    wareForm.fileUrl = res.url
+    wareForm.fileUrl = (res as any).fileUrl || (res as any).url || ''
     wareForm.fileSize = file.size || 0
     ElMessage.success('文件上传成功')
   } catch (err: any) {
@@ -514,7 +772,7 @@ async function handleCreateWare() {
   try {
     await createCourseware(courseId.value, { 
       ...wareForm, 
-      chapterId: selectedChapterId.value 
+      chapterId: wareForm.chapterId || selectedChapterId.value 
     })
     ElMessage.success('课件上传成功，等待审核或已发布')
     showAddWareDialog.value = false
@@ -530,6 +788,19 @@ async function handleCreateWare() {
 const taskLoading = ref(false)
 const tasks = ref<TaskItem[]>([])
 const showCreateTaskDialog = ref(false)
+const taskSubmitting = ref(false)
+const taskForm = reactive({
+  taskTitle: '',
+  taskType: 1 as 1|2|3,
+  totalScore: 100,
+  startTime: '',
+  endTime: '',
+  taskDescription: '',
+})
+
+function resetTaskForm() {
+  Object.assign(taskForm, { taskTitle: '', taskType: 1, totalScore: 100, startTime: '', endTime: '', taskDescription: '' })
+}
 
 function taskStatusType(s: number): '' | 'info' | 'success' | 'warning' { return ({ 0: 'info', 1: 'success', 2: 'warning' } as Record<number, '' | 'info' | 'success' | 'warning'>)[s] ?? 'info' }
 function taskStatusLabel(s: number): string { return ({ 0: '草稿', 1: '进行中', 2: '已结束' } as Record<number, string>)[s] ?? '—' }
@@ -549,12 +820,49 @@ async function deleteTaskById(id: string) {
   ElMessage.success('已删除')
 }
 
+async function handleCreateTask() {
+  if (!taskForm.taskTitle.trim()) { ElMessage.warning('任务名称不能为空'); return }
+  if (taskForm.taskType !== 1) {
+    if (!taskForm.startTime) { ElMessage.warning('测验/考试的开始时间不能为空'); return }
+    if (!taskForm.endTime) { ElMessage.warning('测验/考试的截止时间不能为空'); return }
+  }
+  taskSubmitting.value = true
+  try {
+    const payload = { ...taskForm, courseId: courseId.value, status: 1 } // 默认立即发布
+    // 作业类型不传空字符串的时间，避免后端 LocalDateTime 解析报错
+    if (payload.taskType === 1) {
+      delete (payload as any).startTime
+      delete (payload as any).endTime
+    }
+    await createTask(courseId.value, payload)
+    ElMessage.success('任务发布成功')
+    showCreateTaskDialog.value = false
+    resetTaskForm()
+    fetchTasks()
+    if (course.value) course.value.taskCount = (course.value.taskCount || 0) + 1
+  } finally {
+    taskSubmitting.value = false
+  }
+}
+
 // ───── 讨论话题 ─────
 const postLoading = ref(false)
 const posts = ref<PageResponse<PostItem>>({ records: [], total: 0, pageNum: 1, pageSize: 10 })
 const postQuery = reactive({ pageNum: 1, pageSize: 10 })
 const showCreatePostDialog = ref(false)
 const postSubmitting = ref(false)
+
+function handlePostClick(postId: string) {
+  if (!canInteract.value) {
+    if (isCourseFinished.value) {
+      ElMessage.warning('该课程已经结课，讨论不可再互动')
+    } else {
+      ElMessage.warning('请先加入课程再参与讨论')
+    }
+    return
+  }
+  router.push(`/community/topic/${postId}`)
+}
 const postForm = reactive({ postTitle: '', postContent: '' })
 
 async function fetchPosts() {
@@ -600,11 +908,12 @@ function openNotice(n: AnnouncementItem) {
 }
 
 async function handleCreateNotice() {
-  if (!noticeForm.title.trim() || !noticeForm.content.trim()) { ElMessage.warning('请填写标题和内容'); return }
+  if (!noticeForm.title.trim()) { ElMessage.warning('请输入公告标题'); return }
+  if (!noticeForm.content.trim()) { ElMessage.warning('请输入公告内容'); return }
   noticeSubmitting.value = true
   try {
-    await createAnnouncement(courseId.value, { ...noticeForm })
-    ElMessage.success('公告已发布')
+    await createAnnouncement(courseId.value, { ...noticeForm, courseId: courseId.value })
+    ElMessage.success('公告发布成功')
     showCreateNoticeDialog.value = false
     Object.assign(noticeForm, { title: '', content: '', isTop: 0 })
     fetchAnnouncements()
@@ -640,6 +949,11 @@ onMounted(async () => {
       } catch {
         isMember.value = false
       }
+    }
+    
+    // 弹出全局系统提示
+    if (isCourseFinished.value) {
+      ElMessage.warning('该课程已经结课')
     }
   } finally {
     pageLoading.value = false
@@ -890,4 +1204,32 @@ onMounted(async () => {
   background: linear-gradient(135deg, #ff5252, #d32f2f) !important;
   border: none !important;
 }
+
+/* ===== 封面上传组件样式 ===== */
+.cover-uploader { width: 100%; }
+:deep(.cover-uploader .el-upload) {
+  width: 100%;
+  border: 1px dashed #d9d9d9;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: var(--el-transition-duration-fast);
+  height: 140px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #fafafa;
+}
+:deep(.cover-uploader .el-upload:hover) { border-color: #ff5252; }
+.cover-placeholder { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; height: 100%; color: #8c939d; }
+.cover-uploader-icon { font-size: 28px; color: #8c939d; }
+.cover-preview { position: relative; width: 100%; height: 100%; display: flex; justify-content: center; align-items: center; }
+.cover-image { max-width: 100%; max-height: 100%; object-fit: contain; }
+.cover-edit-mask {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.4); display: flex; justify-content: center; align-items: center;
+  color: #fff; opacity: 0; font-size: 24px; transition: opacity 0.2s;
+}
+.cover-preview:hover .cover-edit-mask { opacity: 1; }
 </style>

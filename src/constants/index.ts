@@ -116,7 +116,6 @@ export const FRONT_MENUS = [
 /** 后台侧边栏：校领导的后台菜单（包含学校相关后台管理） */
 export const SCHOOL_LEADER_MENUS = [
   { title: '数据看板', icon: 'DataBoard', path: '/admin/dashboard' },
-  { title: '学校管理', icon: 'OfficeBuilding', path: '/admin/schools' },
   { title: '内容审核', icon: 'CircleCheckFilled', path: '/admin/audit' },
   { title: '报告管理', icon: 'Document', path: '/admin/reports' },
 ]

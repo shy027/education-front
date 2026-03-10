@@ -72,8 +72,8 @@ export interface AuditLog {
   id: string
   auditorId: string
   auditorName: string
-  auditStatus: number
-  auditComment?: string
+  auditResult: number
+  auditRemark?: string
   auditTime: string
 }
 
@@ -97,7 +97,7 @@ export const deleteResource = (id: string) =>
 export const submitResourceForAudit = (id: string) =>
   post<void>(`/v1/resources/${id}/submit`)
 
-export const auditResource = (id: string, data: { auditStatus: number; auditComment?: string }) =>
+export const auditResource = (id: string, data: { auditResult: number; auditRemark?: string }) =>
   post<void>(`/v1/resources/${id}/audit`, data)
 
 export const getPendingResources = (params?: PageQuery) =>
@@ -139,17 +139,17 @@ export const deleteTag = (tagId: string) =>
 export const uploadResourceImage = (file: File) => {
   const form = new FormData()
   form.append('file', file)
-  return upload<{ url: string; fileName: string; fileSize: number }>('/v1/upload/image', form)
+  return upload<{ fileUrl: string; fileName: string; fileSize: number }>('/v1/upload/image', form)
 }
 
 export const uploadResourceVideo = (file: File) => {
   const form = new FormData()
   form.append('file', file)
-  return upload<{ url: string; fileName: string; fileSize: number }>('/v1/upload/video', form)
+  return upload<{ fileUrl: string; fileName: string; fileSize: number }>('/v1/upload/video', form)
 }
 
 export const uploadResourcePdf = (file: File) => {
   const form = new FormData()
   form.append('file', file)
-  return upload<{ url: string; fileName: string; fileSize: number }>('/v1/upload/pdf', form)
+  return upload<{ fileUrl: string; fileName: string; fileSize: number }>('/v1/upload/pdf', form)
 }

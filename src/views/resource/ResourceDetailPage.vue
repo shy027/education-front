@@ -197,16 +197,16 @@
             <el-timeline-item
               v-for="log in auditLogs"
               :key="log.id"
-              :type="log.auditStatus === 1 ? 'success' : log.auditStatus === 0 ? 'danger' : 'warning'"
+              :type="log.auditResult === 1 ? 'success' : log.auditResult === 2 ? 'danger' : 'warning'"
               :timestamp="log.auditTime?.slice(0, 16)"
               placement="top"
             >
               <div class="log-item">
                 <span class="log-auditor">{{ log.auditorName }}</span>：
-                <el-tag :type="log.auditStatus === 1 ? 'success' : 'danger'" size="small">
-                  {{ log.auditStatus === 1 ? '通过' : '拒绝' }}
+                <el-tag :type="log.auditResult === 1 ? 'success' : 'danger'" size="small">
+                  {{ log.auditResult === 1 ? '通过' : '拒绝' }}
                 </el-tag>
-                <span v-if="log.auditComment" class="log-comment">{{ log.auditComment }}</span>
+                <span v-if="log.auditRemark" class="log-comment">{{ log.auditRemark }}</span>
               </div>
             </el-timeline-item>
           </el-timeline>
@@ -413,17 +413,17 @@ async function handleOffline() {
 
 // ─── 管理员审核 ───
 async function handleAdminAudit(status: number) {
-  const approved = status === 2
-  let comment: string | undefined
+  const approved = status === 1
+  let remark: string | undefined
   if (!approved) {
     const { value } = await ElMessageBox.prompt('请输入拒绝理由', '审核拒绝', {
       confirmButtonText: '确认',
       cancelButtonText: '取消',
       inputPlaceholder: '请说明拒绝原因',
     })
-    comment = value
+    remark = value
   }
-  await auditResource(resourceId.value, { auditStatus: status, auditComment: comment })
+  await auditResource(resourceId.value, { auditResult: status, auditRemark: remark })
   ElMessage.success(approved ? '已通过审核' : '已拒绝')
   resource.value!.status = approved ? 2 : 4  // 2=已发布 4=审核拒绝
 }

@@ -33,16 +33,26 @@ export const useAuthStore = defineStore('auth', {
     /** 账号密码登录 */
     async login(data: LoginRequest): Promise<void> {
       const res = await post<LoginResponse>('/v1/auth/login', data)
+      this.saveLoginResult(res)
+    },
+
+    /** 手机号验证码登录 */
+    async phoneLogin(data: { phone: string; code: string }): Promise<void> {
+      const res = await post<LoginResponse>('/v1/auth/phone-code-login', data)
+      this.saveLoginResult(res)
+    },
+
+    /** 统一保存登录结果 */
+    saveLoginResult(res: LoginResponse): void {
       this.token = res.token
-      // 后端返回结构：{ token, userInfo: { userId, username, realName, avatar, roles } }
       const u = res.userInfo
       this.userInfo = {
         userId: String(u.userId),
         username: u.username,
         realName: u.realName,
-        avatar: u.avatar,
-        phone: '',
-        email: '',
+        avatar: u.avatar || '',
+        phone: u.phone || '',
+        email: u.email || '',
         roles: u.roles ?? [],
         schoolId: u.schoolId ?? null,
         schoolName: u.schoolName ?? null,

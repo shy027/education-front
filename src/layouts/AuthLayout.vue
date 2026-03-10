@@ -32,7 +32,7 @@
       <div class="form-inner">
         <router-view />
       </div>
-      <p class="copyright">© 2025 课程思政融合育人平台 v1.0 | 立德树人 · 铸魂育人</p>
+      <p class="copyright">© 2026 课程思政融合育人平台 v1.0 | 立德树人 · 铸魂育人</p>
     </div>
   </div>
 </template>

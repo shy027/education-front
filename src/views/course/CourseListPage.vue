@@ -64,10 +64,10 @@
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="query.status" placeholder="进行中" clearable style="width: 100px">
+          <el-select v-model="query.status" placeholder="不限" clearable style="width: 100px">
             <el-option label="暂未开放" :value="0" />
             <el-option label="进行中" :value="1" />
-            <el-option label="已结课" :value="2" />
+            <el-option v-if="activeTab === 'mine'" label="已结课" :value="2" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -107,10 +107,19 @@
               {{ c.memberCount }}
             </div>
           </div>
-          <!-- 加入/退出按钮（仅对学生身份） -->
+          <!-- 加入/进入按钮（仅对学生身份） -->
           <div v-if="!authStore.isTeacher && !authStore.isAdmin" class="card-action" @click.stop>
             <el-button
-              v-if="c.status === 1"
+              v-if="myCourseIds.has(String(c.id)) || activeTab === 'mine'"
+              size="small"
+              class="join-btn"
+              type="primary"
+              @click="$router.push(`/course/${c.id}`)"
+            >
+              进入课程
+            </el-button>
+            <el-button
+              v-else-if="getCalculatedStatus(c) === 'ongoing' || c.status === 1"
               size="small"
               class="join-btn"
               :loading="c._joining"
@@ -175,6 +184,24 @@
             <el-radio :value="2">审批加入</el-radio>
           </el-radio-group>
         </el-form-item>
+        <el-form-item label="开课时间" prop="startTime">
+          <el-date-picker
+            v-model="createForm.startTime"
+            type="datetime"
+            placeholder="选择开课时间"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="结课时间" prop="endTime">
+          <el-date-picker
+            v-model="createForm.endTime"
+            type="datetime"
+            placeholder="选择结课时间 (可选，不填表示不结课)"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 100%"
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showCreateDialog = false">取消</el-button>
@@ -212,10 +239,23 @@ const query = reactive({
   keyword: '',
   subjectArea: '' as string | undefined,
   joinType: undefined as number | undefined,
-  status: 1 as number | undefined, // 默认显示进行中
+  status: undefined as number | undefined, // 默认显示不限
   pageNum: 1,
   pageSize: 12,
 })
+
+const myCourseIds = ref<Set<string>>(new Set())
+
+async function fetchMyCourseIds() {
+  if (authStore.isTeacher || authStore.isAdmin) return
+  try {
+    const res = await getMyCourses()
+    const learning = res.learning ?? []
+    myCourseIds.value = new Set(learning.map((c) => String(c.courseId ?? c.id)))
+  } catch (err) {
+    /* ignore */
+  }
+}
 
 // ───── 学科领域标签 ─────
 const subjectAreaOptions = ref<string[]>([])
@@ -257,8 +297,9 @@ async function fetchList() {
         teacherName: c.teacherName ?? '',
         memberCount: c.studentCount ?? c.memberCount ?? 0,
         subjectArea: c.subjectArea ?? '',
-        auditStatus: 0,
+        auditStatus: c.auditStatus ?? 0,
         createdTime: c.createdTime ?? '',
+        startTime: c.startTime,
         endTime: c.endTime,
       }))
       // 客户端多维度过滤
@@ -271,8 +312,9 @@ async function fetchList() {
       if (query.subjectArea) {
         filteredList = filteredList.filter((c) => c.subjectArea === query.subjectArea)
       }
-      if (query.status !== undefined && query.status !== null && query.status !== '') {
-        filteredList = filteredList.filter((c) => c.status === query.status)
+      if (query.status !== undefined && query.status !== null && query.status !== '' as any) {
+        const statusMap = { 0: 'notStarted', 1: 'ongoing', 2: 'finished' } as Record<number, string>
+        filteredList = filteredList.filter((c) => getCalculatedStatus(c) === statusMap[query.status as number])
       }
       
       total.value = filteredList.length
@@ -289,7 +331,10 @@ async function fetchList() {
         joinType: query.joinType,
         status: query.status,
       })
-      courseList.value = res.records || []
+      let list = res.records || []
+      // 需求：对全部课程的显示进行修改，不显示已结课的课程
+      list = list.filter((c) => getCalculatedStatus(c) !== 'finished')
+      courseList.value = list
       total.value = res.total
     }
   } finally {
@@ -304,7 +349,7 @@ function handleSearch() {
 
 function handleReset() {
   searchKeyword.value = ''
-  Object.assign(query, { keyword: '', subjectArea: undefined, joinType: undefined, status: 1, pageNum: 1 })
+  Object.assign(query, { keyword: '', subjectArea: undefined, joinType: undefined, status: undefined, pageNum: 1 })
   fetchList()
 }
 
@@ -315,20 +360,34 @@ function switchTab(tab: 'all' | 'mine') {
 }
 
 // ───── 标签显示 ─────
-/** 判断课程是否已过结束时间（前端实时计算，弥补后端定时任务窗口期） */
-function isExpired(c: CourseItem): boolean {
-  return c.status === 1 && !!c.endTime && new Date(c.endTime) < new Date()
+/** 综合计算课程状态 */
+function getCalculatedStatus(c: CourseItem): 'audit' | 'notStarted' | 'ongoing' | 'finished' {
+  if (c.auditStatus === 0) return 'audit' // 审核中
+  const now = new Date()
+  if (c.startTime && new Date(c.startTime) > now) return 'notStarted' // 暂未开放
+  if (c.endTime && new Date(c.endTime) < now) return 'finished' // 已结课
+  return 'ongoing' // 进行中
 }
 
-function statusType(c: CourseItem): '' | 'info' | 'success' | 'warning' {
-  if (isExpired(c)) return 'warning'
-  return ({ 0: 'info', 1: 'success', 2: 'warning' } as Record<number, '' | 'info' | 'success' | 'warning'>)[c.status] ?? ''
+function statusType(c: CourseItem): '' | 'info' | 'success' | 'warning' | 'danger' {
+  const s = getCalculatedStatus(c)
+  if (s === 'audit') return 'warning'
+  if (s === 'notStarted') return 'info'
+  if (s === 'ongoing') return 'success'
+  if (s === 'finished') return 'info'
+  return ''
 }
+
 // ───── 操作处理 ─────
 function joinTypeLabel(t: number): string { return ({ 1: '公开加入', 2: '审批加入' } as Record<number, string>)[t] ?? '' }
+
 function statusLabel(c: CourseItem): string {
-  if (isExpired(c)) return '已结课'
-  return ({ 0: '暂未开放', 1: '进行中', 2: '已结课' } as Record<number, string>)[c.status] ?? '未知'
+  const s = getCalculatedStatus(c)
+  if (s === 'audit') return '审核中'
+  if (s === 'notStarted') return '暂未开放'
+  if (s === 'ongoing') return '进行中'
+  if (s === 'finished') return '已结课'
+  return '未知'
 }
 
 // ───── 加入课程 ─────
@@ -337,6 +396,7 @@ async function handleJoin(course: CourseItem & { _joining?: boolean }) {
   try {
     await joinCourse(course.id)
     ElMessage.success('加入成功，快去学习吧！')
+    myCourseIds.value.add(course.id)
     router.push(`/course/${course.id}`)
   } finally {
     course._joining = false
@@ -353,6 +413,8 @@ const createForm = reactive<CourseCreateReq>({
   description: '',
   subjectArea: '',
   joinType: 1,
+  startTime: '',
+  endTime: '',
 })
 
 const createRules: FormRules = {
@@ -361,20 +423,28 @@ const createRules: FormRules = {
     { max: 50, message: '课程名称不超过 50 个字符', trigger: 'blur' },
   ],
   joinType: [{ required: true, message: '请选择加入方式', trigger: 'change' }],
+  startTime: [{ required: true, message: '请选择开课时间', trigger: 'change' }],
 }
 
 function resetCreateForm() {
-  Object.assign(createForm, { courseName: '', description: '', subjectArea: '', joinType: 1 })
+  Object.assign(createForm, { courseName: '', description: '', subjectArea: '', joinType: 1, startTime: '', endTime: '' })
   createFormRef.value?.clearValidate()
 }
 
 async function handleCreate() {
   if (!(await createFormRef.value?.validate().catch(() => false))) return
+  
+  if (!authStore.userInfo?.schoolId) {
+    ElMessage.error('该账号未绑定学校，无法创建课程')
+    return
+  }
+
   creating.value = true
   try {
     const courseId = await createCourse({
       ...createForm,
       subjectArea: createForm.subjectArea || undefined,
+      schoolId: authStore.userInfo.schoolId // 加上必填的 schoolId
     })
     ElMessage.success('课程创建成功')
     showCreateDialog.value = false
@@ -386,6 +456,7 @@ async function handleCreate() {
 
 onMounted(() => {
   fetchSubjects()
+  fetchMyCourseIds()
   fetchList()
 })
 </script>

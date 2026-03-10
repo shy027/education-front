@@ -35,6 +35,8 @@ export interface LoginResponse {
     realName: string
     avatar: string
     roles: UserRole[]
+    phone: string
+    email: string
     schoolId?: string | number | null
     schoolName?: string | null
   }

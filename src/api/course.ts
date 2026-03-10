@@ -14,16 +14,19 @@ export interface CourseCreateReq {
   subjectArea?: string
   joinType: number        // 0=公开 1=审批 2=邀请码
   inviteCode?: string
-  schoolId?: string
+  schoolId?: string | number
+  startTime?: string
+  endTime?: string
 }
 
 export interface CourseItem {
   id: string
   courseName: string
   description: string
+  courseIntro?: string
   cover: string
   courseCover?: string
-  status: number          // 0=草稿 1=进行中 2=已结课
+  status: number          // 原本: 0=草稿 1=进行中 2=已结课 - 现改由前端计算，但仍保留接收
   joinType: number
   teacherId: string
   teacherName: string
@@ -32,6 +35,7 @@ export interface CourseItem {
   subjectArea: string
   auditStatus: number
   createdTime: string
+  startTime?: string
   endTime?: string        // 结束时间，为空表示永不结束
 }
 
@@ -56,6 +60,8 @@ export interface MyCourseItem {
   myRole?: number
   studentCount?: number
   status: number
+  auditStatus?: number
+  startTime?: string
   endTime?: string
   // 以下为兼容旧字段（若后端同时返回）
   id?: string
@@ -141,8 +147,19 @@ export const getCourseDetail = (id: string) =>
 export const createCourse = (data: CourseCreateReq) =>
   post<string>('/v1/courses', data)
 
-export const updateCourse = (data: CourseCreateReq & { id: string }) =>
-  put<void>('/v1/courses', data)
+export const updateCourse = (data: Partial<CourseCreateReq> & { 
+  id: string;
+  courseIntro?: string;
+  courseCover?: string;
+  description?: string;
+  cover?: string;
+}) => {
+  return put<void>('/v1/courses', {
+    ...data,
+    courseIntro: data.courseIntro || data.description,
+    courseCover: data.courseCover || data.cover
+  })
+}
 
 export const updateCourseStatus = (id: string, status: number) =>
   put<void>(`/v1/courses/${id}/status`, null, { params: { status } })
@@ -155,8 +172,8 @@ export const getMyCourses = () =>
 export const getChapterTree = (courseId: string) =>
   get<ChapterNode[]>(`/v1/courses/${courseId}/chapters/tree`)
 
-export const createChapter = (courseId: string, data: { title: string; parentId?: string; sortOrder?: number }) =>
-  post<string>(`/v1/courses/${courseId}/chapters`, data)
+export const createChapter = (courseId: string, data: { chapterName: string; parentId?: string; sortOrder?: number; courseId?: string }) =>
+  post<string>(`/v1/courses/${courseId}/chapters`, { ...data, courseId })
 
 export const deleteChapter = (courseId: string, id: string) =>
   del<void>(`/v1/courses/${courseId}/chapters/${id}`)

@@ -331,7 +331,7 @@ async function fetchList() {
         joinType: query.joinType,
         status: query.status,
       })
-      let list = res.records || []
+      let list = res.list || res.records || []
       // 需求：对全部课程的显示进行修改，不显示已结课的课程
       list = list.filter((c) => getCalculatedStatus(c) !== 'finished')
       courseList.value = list

@@ -2,12 +2,12 @@
   <div class="report-page">
 
     <!-- ===== 详情态 ===== -->
-    <div v-if="detailCourse" class="detail-view">
+    <div v-if="detailCourse || authStore.isStudent" class="detail-view">
       <div class="detail-header">
-        <el-button :icon="ArrowLeft" text @click="backToList">返回报告列表</el-button>
+        <el-button v-if="!authStore.isStudent" :icon="ArrowLeft" text @click="backToList">返回报告列表</el-button>
         <div class="detail-header-info">
-          <h2 class="detail-title">{{ detailCourse.courseName }}</h2>
-          <p class="detail-desc">{{ authStore.isStudent ? '个人素养画像详情' : '课程报告管理' }}</p>
+          <h2 class="detail-title">{{ authStore.isStudent ? '个人综合素养全景' : detailCourse?.courseName }}</h2>
+          <p class="detail-desc">{{ authStore.isStudent ? '汇聚全平台学习数据的素养画像' : '课程报告管理' }}</p>
         </div>
       </div>
 
@@ -44,7 +44,6 @@
             <div class="section-card radar-card">
               <div class="card-header">
                 <h3>五维素养雷达图</h3>
-                <el-button size="small" :loading="calculating" @click="doCalculate">更新评估</el-button>
               </div>
               <div ref="radarChartRef" class="radar-chart" />
             </div>
@@ -113,8 +112,8 @@
       </div>
     </div>
 
-    <!-- ===== 列表态 ===== -->
-    <div v-else>
+    <!-- ===== 列表态 (教师/校领导) ===== -->
+    <div v-else-if="!authStore.isStudent">
       <div class="page-header">
         <div>
           <h2 class="page-title">{{ authStore.isStudent ? '素养报告' : '教学报告' }}</h2>
@@ -248,10 +247,13 @@ const schoolReports = ref<ReportDTO[]>([])
 async function fetchListData() {
   listLoading.value = true
   try {
+    if (authStore.isStudent) {
+      await openDetailForStudent()
+      return
+    }
+
     const res = await getMyCourses()
-    myCourseOptions.value = authStore.isStudent
-      ? (res.learning ?? [])
-      : (res.teaching ?? [])
+    myCourseOptions.value = res.teaching ?? []
 
     // 并行加载每课摘要
     await Promise.all(myCourseOptions.value.map(c => loadCourseSummary(c)))
@@ -260,7 +262,7 @@ async function fetchListData() {
     if (authStore.isSchoolLeader) {
       try {
         const sr = await getAllReportList({ reportType: 2, pageNum: 1, pageSize: 50 })
-        schoolReports.value = sr?.records ?? []
+        schoolReports.value = sr?.list || sr?.records || []
       } catch { /* 静默 */ }
     }
   } finally {
@@ -307,25 +309,35 @@ const dimensions = computed(() =>
 )
 
 function currentCourseId() {
+  if (authStore.isStudent) return '0' // 学生全局画像使用伪造全局 ID
   const c = detailCourse.value
   return c ? String(c.courseId ?? '') : ''
+}
+
+async function openDetailForStudent() {
+  detailLoading.value = true
+  try {
+    const cid = '0'
+    await Promise.all([
+      getMyProfile(cid).then(r => { profile.value = r }).catch(() => { profile.value = null }),
+      getLearningStatistics(cid).then(r => { stats.value = r }).catch(() => { stats.value = null }),
+      fetchGrowthTrack(),
+    ])
+    await nextTick()
+    initRadarChart()
+    initLineChart()
+  } finally { detailLoading.value = false }
 }
 
 async function openDetail(c: MyCourseItem) {
   detailCourse.value = c
   detailLoading.value = true
-  await nextTick()
   try {
     const cid = String(c.courseId ?? '')
     await Promise.all([
-      getMyProfile(cid).then(r => { profile.value = r }).catch(() => { profile.value = null }),
-      getLearningStatistics(cid).then(r => { stats.value = r }).catch(() => { stats.value = null }),
       fetchGrowthTrack(),
-      ...(!authStore.isStudent ? [fetchReports()] : []),
+      fetchReports()
     ])
-    await nextTick()
-    initRadarChart()
-    initLineChart()
   } finally { detailLoading.value = false }
 }
 

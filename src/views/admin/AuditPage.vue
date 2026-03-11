@@ -194,7 +194,7 @@ async function fetchPending() {
       ? undefined
       : activeTab.value as AuditPendingQuery['contentType']
     const res = await getPendingList({ ...pendingQuery, contentType })
-    pendingList.value = res?.records || []
+    pendingList.value = res?.list || res?.records || []
     pendingTotal.value = res?.total ?? 0
     if (activeTab.value === 'all') pendingCount.value = res?.total ?? 0
   } finally { loading.value = false }
@@ -272,7 +272,7 @@ async function fetchHistory() {
   loading.value = true
   try {
     const res = await getAuditHistory(historyQuery)
-    historyList.value = res?.records || []
+    historyList.value = res?.list || res?.records || []
     historyTotal.value = res?.total ?? 0
   } finally { loading.value = false }
 }

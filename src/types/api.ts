@@ -10,8 +10,8 @@ export interface PageResponse<T> {
   total: number
   pageNum?: number
   pageSize?: number
-  list: T[]          // 后端 PageResult 实际字段名
-  records?: T[]      // 兼容旧调用点（不再使用）
+  list?: T[]         // 后端 PageResult 实际字段名 (resource-service, audit-service)
+  records?: T[]      // 后端 MyBatis-Plus Page 实际字段名 (course-service, community-service)
 }
 
 /** 分页查询参数 */

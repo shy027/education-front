@@ -95,7 +95,7 @@ async function fetchResources() {
   loading.value = true
   try {
     const res = await getResourceList(query)
-    resources.value = res?.records || []
+    resources.value = res?.list || res?.records || []
     total.value = res?.total ?? 0
   } finally { loading.value = false }
 }
@@ -104,7 +104,7 @@ function handleSearch() { query.pageNum = 1; fetchResources() }
 
 // 通过审核（auditStatus=2）
 async function handleAudit(id: string, status: number) {
-  await auditResource(id, { auditStatus: status })
+  await auditResource(id, { auditResult: status })
   ElMessage.success('审核通过')
   fetchResources()
 }
@@ -115,7 +115,7 @@ async function handleAuditReject(id: string) {
     confirmButtonText: '确认拒绝',
     cancelButtonText: '取消',
   })
-  await auditResource(id, { auditStatus: 4, auditComment: comment })
+  await auditResource(id, { auditResult: 2, auditRemark: comment })
   ElMessage.success('已拒绝')
   fetchResources()
 }

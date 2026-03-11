@@ -37,6 +37,8 @@ export interface CourseItem {
   createdTime: string
   startTime?: string
   endTime?: string        // 结束时间，为空表示永不结束
+  coursewareCount?: number
+  taskCount?: number
 }
 
 export interface CourseQuery extends PageQuery {
@@ -83,6 +85,7 @@ export interface ChapterNode {
   chapterName: string
   sortOrder: number
   children: ChapterNode[]
+  resourceList?: ChapterResourceItem[]
 }
 
 export interface CoursewareItem {
@@ -96,6 +99,7 @@ export interface CoursewareItem {
   sortOrder: number
   auditStatus: number
   progress?: number       // 学习进度（百分比）
+  allowDownload?: number
 }
 
 export interface TaskItem {
@@ -177,6 +181,22 @@ export const createChapter = (courseId: string, data: { chapterName: string; par
 
 export const deleteChapter = (courseId: string, id: string) =>
   del<void>(`/v1/courses/${courseId}/chapters/${id}`)
+
+export interface ChapterResourceItem {
+  id: string
+  resourceId: string
+  title: string
+  resourceType: number
+  coverUrl?: string
+  fileUrl?: string
+  bindTime: string
+}
+
+export const bindChapterResource = (courseId: string, chapterId: string, resourceId: string) =>
+  post<void>(`/v1/courses/${courseId}/chapters/${chapterId}/resources/${resourceId}`)
+
+export const unbindChapterResource = (courseId: string, chapterId: string, resourceId: string) =>
+  del<void>(`/v1/courses/${courseId}/chapters/${chapterId}/resources/${resourceId}`)
 
 // ===================== 课件 =====================
 

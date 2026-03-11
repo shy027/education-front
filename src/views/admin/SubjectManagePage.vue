@@ -122,7 +122,7 @@ async function fetchData() {
   loading.value = true
   try {
     const res = await getSubjectPage(query)
-    tableData.value = res.records || []
+    tableData.value = res.list || res.records || []
     total.value = res.total || 0
   } catch (error: any) {
     ElMessage.error(error.message || '获取列表失败')

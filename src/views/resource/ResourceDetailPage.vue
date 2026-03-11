@@ -296,10 +296,9 @@ function typeLabel(t: number): string { return { 1: '文章', 2: '视频', 3: '�
 const selectedAttachIdx = ref(-1) // 初始为 -1，不自动触发预览以防自动下载
 
 const currentFile = computed(() => {
-  if (resource.value?.attachments?.length) {
-    return resource.value.attachments[selectedAttachIdx.value] || resource.value.attachments[0]
-  }
-  return null
+  // 注意：index=-1 时一定返回 null，避免 attachments[-1] 为 undefined 时 || 兜底到 attachments[0]
+  if (selectedAttachIdx.value < 0 || !resource.value?.attachments?.length) return null
+  return resource.value.attachments[selectedAttachIdx.value] ?? null
 })
 
 const previewUrl = computed(() => {
@@ -478,12 +477,8 @@ const audioPlaying = ref(false)
 
 onMounted(async () => {
   await fetchDetail()
-  // 仅视频/音频类资源默认开启预览，文档类保持 -1 等待手动点击，防止自动下载
-  if (resource.value?.attachments?.length) {
-    if (resource.value.resourceType === 2 || resource.value.resourceType === 4) {
-      selectedAttachIdx.value = 0
-    }
-  }
+  // 保持 selectedAttachIdx = -1，所有附件均等待用户手动点击「在线预览」后激活
+  // 避免对带 Content-Disposition: attachment 的 OSS 附件自动触发浏览器下载
   fetchRelated()
   trackView()
 })

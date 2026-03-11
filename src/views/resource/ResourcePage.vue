@@ -213,7 +213,7 @@ const total = ref(0)
 async function fetchResources() {
   loading.value = true
   try {
-    const res = await getResourceList(query)
+    const res = await getResourceList({ ...query, sortMode: sortMode.value })
     resources.value = (res as any)?.list ?? res?.records ?? []
     total.value = res?.total ?? 0
   } catch {

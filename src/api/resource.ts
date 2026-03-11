@@ -51,6 +51,8 @@ export interface ResourceQuery extends PageQuery {
   status?: number
   creatorId?: string
   tagId?: string
+  resourceType?: number
+  sortMode?: string
 }
 
 export interface CategoryNode {

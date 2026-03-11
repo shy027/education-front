@@ -78,17 +78,23 @@
             </el-tree>
           </div>
 
-          <!-- 右：课件列表 -->
+          <!-- 右：课件及资源列表 -->
           <div class="ware-list-wrap">
             <div class="ware-list-header">
-              <span>{{ selectedChapterId ? '课件列表' : '全部课件' }}</span>
-              <el-button v-if="isMyTeaching && !isCourseFinished" type="primary" size="small" :icon="Plus" class="red-sm-btn" @click="showAddWareDialog = true">
-                上传课件
-              </el-button>
+              <span>{{ selectedChapterId ? '课件与资源列表' : '全部课件与资源' }}</span>
+              <div v-if="isMyTeaching && !isCourseFinished && selectedChapterId" style="display: flex; gap: 10px;">
+                <el-button type="primary" size="small" :icon="Plus" class="red-sm-btn" @click="openAddWareDialog">
+                  上传课件
+                </el-button>
+                <el-button type="success" size="small" :icon="Link" @click="openBindResourceDialog">
+                  关联资源
+                </el-button>
+              </div>
             </div>
-            <div v-if="wares.length === 0" class="ware-empty">
-              <el-empty description="该章节暂无课件" :image-size="60" />
+            <div v-if="wares.length === 0 && selectedChapterResources.length === 0" class="ware-empty">
+              <el-empty :description="selectedChapterId ? '该章节暂无内容' : '暂无课件或资源'" :image-size="60" />
             </div>
+            
             <div
               v-for="w in wares"
               :key="w.id"
@@ -111,6 +117,25 @@
               </div>
               <el-button v-if="w.allowDownload === 1 && canInteract" text type="primary" size="small" :icon="Download" @click.stop="downloadWare(w)">下载</el-button>
               <el-button v-if="isMyTeaching && !isCourseFinished" text type="danger" size="small" :icon="Delete" @click.stop="deleteWareById(w.id)" />
+            </div>
+
+            <!-- 选定章节关联共享资源列表 -->
+            <div
+              v-for="res in selectedChapterResources"
+              :key="res.resourceId"
+              class="ware-item bound-resource"
+              @click="openChapterResource(res)"
+            >
+              <div class="ware-icon" :class="`type-${res.resourceType}`">
+                <el-icon><component :is="wareIcon(res.resourceType)" /></el-icon>
+              </div>
+              <div class="ware-info">
+                <div class="ware-title">{{ res.title }} <el-tag size="small" effect="plain" type="info" style="margin-left: 8px;">共享资源</el-tag></div>
+                <div class="ware-meta">
+                  <span>关联于: {{ res.bindTime?.slice(0, 10) }}</span>
+                </div>
+              </div>
+              <el-button v-if="isMyTeaching && !isCourseFinished" text type="danger" size="small" :icon="Delete" @click.stop="toggleBindResource({id: res.resourceId} as any)">取消</el-button>
             </div>
           </div>
         </div>
@@ -158,10 +183,10 @@
               发布话题
             </el-button>
           </div>
-          <el-empty v-if="!posts.records.length" description="暂无讨论话题" :image-size="80" />
+          <el-empty v-if="!posts.list.length" description="暂无讨论话题" :image-size="80" />
           <div class="post-list">
             <div
-              v-for="p in posts.records"
+              v-for="p in posts.list"
               :key="p.id"
               class="post-item"
               @click="handlePostClick(String(p.id))"
@@ -229,6 +254,79 @@
       </template>
     </el-dialog>
 
+    <el-dialog v-model="showBindResourceDialog" title="绑定资源库内容" width="750px" destroy-on-close>
+      <div v-loading="bindResourceLoading" style="min-height: 200px;">
+        <div style="margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap;">
+          <el-input v-model="resourceQuery.keyword" placeholder="搜索资源库标题..." style="width: 200px;" clearable />
+          
+          <el-select v-model="resourceQuery.resourceType" placeholder="资源类型" clearable style="width: 120px;">
+            <el-option label="文章" :value="1" />
+            <el-option label="视频" :value="2" />
+            <el-option label="文档(PDF)" :value="3" />
+            <el-option label="音频" :value="4" />
+          </el-select>
+
+          <el-cascader
+            v-model="resourceQuery.categoryId"
+            :options="categoryTree"
+            :props="{ value: 'id', label: 'categoryName', children: 'children', checkStrictly: true, emitPath: false }"
+            placeholder="全部分类"
+            clearable
+            style="width: 150px"
+          />
+
+          <el-select v-model="resourceQuery.tagId" placeholder="选择标签" clearable style="width: 150px">
+            <el-option v-for="t in tagList" :key="t.id" :label="t.tagName" :value="t.id" />
+          </el-select>
+
+          <el-button type="primary" :icon="Search" @click="fetchAvailableResources">搜索</el-button>
+        </div>
+        
+        <el-table 
+          :data="availableResources" 
+          height="400" 
+          border 
+          @row-click="handleResourceRowClick"
+          :row-style="{ cursor: 'pointer' }"
+        >
+          <el-table-column property="title" label="标题" show-overflow-tooltip min-width="150" />
+          <el-table-column property="resourceType" label="类型" width="80">
+            <template #default="{ row }">
+              <el-tag size="small">{{ ({1:'文章',2:'视频',3:'文档',4:'音频'} as Record<number, string>)[row.resourceType as number] || '其他' }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column property="categoryName" label="分类" width="100" show-overflow-tooltip />
+          <el-table-column label="标签" min-width="120" show-overflow-tooltip>
+            <template #default="{ row }">
+              {{ row.tags?.map((t: any) => t.tagName).join(', ') || '—' }}
+            </template>
+          </el-table-column>
+          <el-table-column property="viewCount" label="浏览量" width="70" align="center" />
+          <el-table-column label="操作" width="90" align="center">
+            <template #default="{ row }">
+              <el-button 
+                size="small" 
+                :type="isResourceBound(row.id) ? 'danger' : 'primary'"
+                @click.stop="toggleBindResource(row)"
+              >
+                {{ isResourceBound(row.id) ? '解绑' : '绑定' }}
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+          <el-pagination
+            background
+            layout="prev, pager, next, total"
+            :total="resourceQueryTotal"
+            :current-page="resourceQuery.pageNum"
+            :page-size="resourceQuery.pageSize"
+            @current-change="handleResourcePageChange"
+          />
+        </div>
+      </div>
+    </el-dialog>
+
     <!-- 创建话题对话框 -->
     <el-dialog v-model="showCreatePostDialog" title="发布讨论话题" width="520px">
       <el-form :model="postForm" label-width="70px" size="large">
@@ -267,19 +365,6 @@
     <!-- 上传课件对话框 -->
     <el-dialog v-model="showAddWareDialog" title="上传课件" width="520px" @close="resetWareForm">
       <el-form :model="wareForm" label-width="80px" size="large">
-        <el-form-item label="所属章节">
-          <el-select v-model="wareForm.chapterId" placeholder="选择章节 (可选)" clearable style="width: 100%">
-            <!-- 如果为了可以选一级，也可以把一级自己放在外面，但用 el-option-group 比较直观 -->
-            <template v-for="c in chapters" :key="c.id">
-              <el-option-group v-if="c.children && c.children.length > 0" :label="c.chapterName">
-                <!-- 允许选父级 -->
-                <el-option :label="`${c.chapterName} (本章)`" :value="c.id" />
-                <el-option v-for="sub in c.children" :key="sub.id" :label="sub.chapterName" :value="sub.id" />
-              </el-option-group>
-              <el-option v-else :label="c.chapterName" :value="c.id" />
-            </template>
-          </el-select>
-        </el-form-item>
         <el-form-item label="标题" required>
           <el-input v-model="wareForm.wareTitle" placeholder="请输入课件标题" clearable />
         </el-form-item>
@@ -436,25 +521,45 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, markRaw } from 'vue'
+import { ref, reactive, onMounted, computed, markRaw } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import {
+  getCourseDetail,
+  updateCourse,
+  getMyCourses,
+  joinCourse,
+  quitCourse,
+  getChapterTree,
+  createChapter,
+  getChapterCoursewares,
+  createCourseware,
+  deleteCourseware,
+  uploadCoursewareFile,
+  getTaskList,
+  createTask,
+  deleteTask,
+  getAnnouncementList,
+  createAnnouncement,
+  deleteAnnouncement,
+  type CourseItem,
+  type ChapterNode,
+  type CoursewareItem,
+  type TaskItem,
+  type AnnouncementItem,
+  type ChapterResourceItem,
+  bindChapterResource,
+  unbindChapterResource
+} from '@/api/course'
+import type { PageResponse } from '@/types/api'
+import { getPostList, createPost, type PostItem } from '@/api/community'
+import { getResourceList, getCategoryTree, getEnabledTags, type ResourceItem, type CategoryNode, type TagItem } from '@/api/resource'
+import { useAuthStore } from '@/stores/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  Reading, User, UserFilled, Plus, Edit, Delete,
-  FolderOpened, VideoPlay, Document, Headset, ChatDotRound, Star, Download
+  Reading, User, UserFilled, Edit, Plus, VideoPlay, Document, Headset, FolderOpened,
+  Download, Delete, Link, Search
 } from '@element-plus/icons-vue'
-import { useAuthStore } from '@/stores/auth'
-import {
-  getCourseDetail, updateCourse, getChapterTree, createChapter, getChapterCoursewares, getCoursewareList, createCourseware, deleteCourseware, uploadCoursewareFile,
-  getTaskList, createTask, deleteTask,
-  getAnnouncementList, createAnnouncement, deleteAnnouncement,
-  joinCourse, quitCourse, getMyCourses,
-} from '@/api/course'
-import { getPostList, createPost } from '@/api/community'
 import { logBehavior } from '@/api/report'
-import type { CourseItem, ChapterNode, CoursewareItem, TaskItem, AnnouncementItem } from '@/api/course'
-import type { PostItem } from '@/api/community'
-import type { PageResponse } from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -494,13 +599,13 @@ function getCalculatedStatus(c: CourseItem): 'audit' | 'notStarted' | 'ongoing' 
   return 'ongoing'
 }
 
-function statusType(c: CourseItem): '' | 'info' | 'success' | 'warning' | 'danger' {
+function statusType(c: CourseItem): undefined | 'info' | 'success' | 'warning' | 'danger' {
   const s = getCalculatedStatus(c)
   if (s === 'audit') return 'warning'
   if (s === 'notStarted') return 'info'
   if (s === 'ongoing') return 'success'
   if (s === 'finished') return 'info'
-  return ''
+  return undefined
 }
 
 function statusLabel(c: CourseItem): string {
@@ -608,7 +713,7 @@ async function handleEditCourse() {
 // ───── Tab ─────
 const activeTab = ref('ware')
 
-function onTabChange(tab: { paneName: string }) {
+function onTabChange(tab: any) {
   if (tab.paneName === 'task' && !tasks.value.length) fetchTasks()
   if (tab.paneName === 'discuss' && !posts.value.records.length) fetchPosts()
   if (tab.paneName === 'notice' && !announcements.value.length) fetchAnnouncements()
@@ -625,13 +730,40 @@ const showAddWareDialog = ref(false)
 async function fetchChapters() {
   const result = await getChapterTree(courseId.value)
   chapters.value = result || []
+  // 若当前未选中章节，则刷新全局聚合资源
+  if (!selectedChapterId.value) {
+    aggregateAllResources()
+  }
+}
+
+/** 递归聚合所有章节的关联资源 */
+function aggregateAllResources() {
+  const allResources: ChapterResourceItem[] = []
+  const collect = (nodes: ChapterNode[]) => {
+    for (const node of nodes) {
+      if (node.resourceList?.length) {
+        allResources.push(...node.resourceList)
+      }
+      if (node.children?.length) {
+        collect(node.children)
+      }
+    }
+  }
+  collect(chapters.value)
+  // 去重（防止同一资源绑定到多个章节）
+  const seenIds = new Set()
+  selectedChapterResources.value = allResources.filter(r => {
+    if (seenIds.has(r.resourceId)) return false
+    seenIds.add(r.resourceId)
+    return true
+  })
 }
 
 async function fetchWares(chapterId?: string) {
   wareLoading.value = true
   try {
     const res = await getChapterCoursewares(courseId.value as string, chapterId)
-    wares.value = res?.records || []
+    wares.value = res?.list || res?.records || []
   } catch {
     wares.value = []
   } finally { wareLoading.value = false }
@@ -639,7 +771,119 @@ async function fetchWares(chapterId?: string) {
 
 function handleChapterClick(data: ChapterNode) {
   selectedChapterId.value = selectedChapterId.value === data.id ? undefined : data.id
+  if (selectedChapterId.value) {
+    selectedChapterResources.value = data.resourceList || []
+  } else {
+    // 聚合全课关联资源
+    aggregateAllResources()
+  }
   fetchWares(selectedChapterId.value)
+}
+
+// ===================== 章节关联资源管理 =====================
+const selectedChapterResources = ref<ChapterResourceItem[]>([])
+const showBindResourceDialog = ref(false)
+const bindResourceLoading = ref(false)
+const availableResources = ref<ResourceItem[]>([])
+const resourceQueryTotal = ref(0)
+const categoryTree = ref<CategoryNode[]>([])
+const tagList = ref<TagItem[]>([])
+
+const resourceQuery = reactive({
+  pageNum: 1,
+  pageSize: 10,
+  keyword: '',
+  resourceType: undefined as number | undefined,
+  categoryId: undefined as string | undefined,
+  tagId: undefined as string | undefined,
+  status: 2 // 仅查询已发布资源
+})
+
+async function openBindResourceDialog() {
+  if (!selectedChapterId.value) {
+    ElMessage.warning('请先在左侧选择具体章节')
+    return
+  }
+  showBindResourceDialog.value = true
+  if (categoryTree.value.length === 0) {
+    try {
+      categoryTree.value = await getCategoryTree()
+      tagList.value = await getEnabledTags()
+    } catch {}
+  }
+  fetchAvailableResources()
+}
+
+async function fetchAvailableResources() {
+  bindResourceLoading.value = true
+  try {
+    const res = await getResourceList(resourceQuery)
+    availableResources.value = res.list || res.records || []
+    resourceQueryTotal.value = res.total || 0
+  } catch (error) {
+    ElMessage.error('获取资源列表失败')
+  } finally {
+    bindResourceLoading.value = false
+  }
+}
+
+function handleResourcePageChange(val: number) {
+  resourceQuery.pageNum = val
+  fetchAvailableResources()
+}
+
+function handleResourceRowClick(row: ResourceItem) {
+  window.open(`/#/resource/${row.id}`, '_blank')
+}
+
+function isResourceBound(resourceId: string) {
+  return selectedChapterResources.value.some(r => r.resourceId === resourceId)
+}
+
+async function toggleBindResource(res: ResourceItem) {
+  if (!selectedChapterId.value) return
+  if (!courseId.value) return
+  
+  const cid = courseId.value as string
+  const chid = selectedChapterId.value
+  
+  try {
+    if (isResourceBound(res.id)) {
+      // 解绑
+      await unbindChapterResource(cid, chid, res.id)
+      selectedChapterResources.value = selectedChapterResources.value.filter(r => r.resourceId !== res.id)
+      ElMessage.success('已取消关联')
+    } else {
+      // 绑定
+      await bindChapterResource(cid, chid, res.id)
+      ElMessage.success('关联成功')
+      // 局部刷新或重载章节树，这里简单往本地数组插入假数据模拟刷新，之后再全量 fetchChapters 稳妥
+      fetchChapters().then(() => {
+        // 恢复选中状态
+        const findNode = (nodes: ChapterNode[]): ChapterNode | undefined => {
+          for (const node of nodes) {
+            if (node.id === chid) return node
+            if (node.children?.length) {
+              const childNode = findNode(node.children)
+              if (childNode) return childNode
+            }
+          }
+          return undefined
+        }
+        const curr = findNode(chapters.value)
+        if (curr) {
+          selectedChapterResources.value = curr.resourceList || []
+        }
+      })
+    }
+  } catch (error) {
+    ElMessage.error('操作失败')
+  }
+}
+
+function openChapterResource(res: ChapterResourceItem) {
+  // 统一跳转至资源详情页供在线预览，避免直接 window.open 触发附件自动下载
+  router.push(`/resource/${res.resourceId}`)
 }
 
 const chapterForm = reactive({
@@ -742,6 +986,16 @@ function resetWareForm() {
   wareFileList.value = []
 }
 
+function openAddWareDialog() {
+  if (!selectedChapterId.value) {
+    ElMessage.warning('请先在左侧选择具体章节')
+    return
+  }
+  resetWareForm()
+  wareForm.chapterId = selectedChapterId.value
+  showAddWareDialog.value = true
+}
+
 async function handleUploadWare(options: any) {
   const file = options.file
   if (!file) return
@@ -809,7 +1063,7 @@ async function fetchTasks() {
   taskLoading.value = true
   try {
     const res = await getTaskList(courseId.value, { pageSize: 50 })
-    tasks.value = res?.records || []
+    tasks.value = res?.list || res?.records || []
   } finally { taskLoading.value = false }
 }
 
@@ -847,7 +1101,7 @@ async function handleCreateTask() {
 
 // ───── 讨论话题 ─────
 const postLoading = ref(false)
-const posts = ref<PageResponse<PostItem>>({ records: [], total: 0, pageNum: 1, pageSize: 10 })
+const posts = ref<PageResponse<PostItem>>({ list: [], total: 0, pageNum: 1, pageSize: 10 })
 const postQuery = reactive({ pageNum: 1, pageSize: 10 })
 const showCreatePostDialog = ref(false)
 const postSubmitting = ref(false)
@@ -869,7 +1123,7 @@ async function fetchPosts() {
   postLoading.value = true
   try {
     const res = await getPostList({ courseId: courseId.value, ...postQuery })
-    posts.value = { ...res, records: res?.records || [] }
+    posts.value = { ...res, list: res?.list || res?.records || [] }
   } finally { postLoading.value = false }
 }
 
@@ -898,7 +1152,7 @@ async function fetchAnnouncements() {
   noticeLoading.value = true
   try {
     const res = await getAnnouncementList(courseId.value, { pageSize: 50 })
-    announcements.value = res?.records || []
+    announcements.value = res?.list || res?.records || []
   } finally { noticeLoading.value = false }
 }
 
@@ -945,7 +1199,7 @@ onMounted(async () => {
       try {
         const myData = await getMyCourses()
         const joined = myData.learning ?? []
-        isMember.value = joined.some((c) => String(c.courseId ?? c.id) === courseId.value)
+        isMember.value = joined.some((c: any) => String(c.courseId ?? c.id) === courseId.value)
       } catch {
         isMember.value = false
       }

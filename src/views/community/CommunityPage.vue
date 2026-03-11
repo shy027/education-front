@@ -41,14 +41,14 @@
     <!-- 话题列表 -->
     <div v-loading="loading" class="content-area">
       <el-empty v-if="!selectedCourseId" description="请先选择课程" :image-size="100" />
-      <el-empty v-else-if="!posts.records.length && !loading" description="暂无讨论话题" :image-size="100">
+      <el-empty v-else-if="!posts.list.length && !loading" description="暂无讨论话题" :image-size="100">
         <el-button v-if="authStore.isTeacher" class="create-btn" @click="showCreateDialog = true">发起第一个话题</el-button>
         <span v-else style="font-size:13px;color:#90a4ae">等待教师发布讨论话题</span>
       </el-empty>
 
       <div v-else class="post-list">
         <div
-          v-for="p in posts.records"
+          v-for="p in posts.list"
           :key="p.id"
           class="post-card"
           @click="$router.push(`/community/topic/${p.id}`)"
@@ -138,7 +138,7 @@ const myCourseOptions = ref<CourseItem[]>([])
 
 async function fetchMyCourses() {
   const res = await getMyCourses()
-  myCourseOptions.value = authStore.isTeacher ? (res.teachingCourses ?? []) : (res.joinedCourses ?? [])
+  myCourseOptions.value = authStore.isTeacher ? (res.teaching ?? []) : (res.learning ?? [])
   if (myCourseOptions.value.length) {
     selectedCourseId.value = myCourseOptions.value[0].id
     onCourseChange()
@@ -156,7 +156,7 @@ const filters = [
 
 // ───── 查询 ─────
 const loading = ref(false)
-const posts = ref<PageResponse<PostItem>>({ records: [], total: 0, pageNum: 1, pageSize: 15 })
+const posts = ref<PageResponse<PostItem>>({ list: [], total: 0, pageNum: 1, pageSize: 15 })
 const query = reactive({ pageNum: 1, pageSize: 15, isTop: undefined as number | undefined, isEssence: undefined as number | undefined })
 
 function applyFilter(key: string) {
@@ -181,7 +181,7 @@ async function fetchPosts() {
       keyword: searchKeyword.value || undefined,
       ...query,
     })
-    posts.value = { ...res, records: res?.records || [] }
+    posts.value = { ...res, list: res?.list || res?.records || [] }
   } finally { loading.value = false }
 }
 

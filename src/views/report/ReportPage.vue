@@ -43,7 +43,7 @@
           <div class="section-row">
             <div class="section-card radar-card">
               <div class="card-header">
-                <h3>五维素养雷达图</h3>
+                <h3>六维素养雷达图</h3>
               </div>
               <div ref="radarChartRef" class="radar-chart" />
             </div>
@@ -152,7 +152,7 @@
                 @click="openDetail(c)"
               >
                 <div class="crc-cover">
-                  <img v-if="c.courseCover || c.cover" :src="c.courseCover ?? c.cover" class="crc-cover-img" />
+                  <img v-if="c.courseCover || c.cover" :src="c.courseCover ?? c.cover" class="crc-cover-img" @error="(e) => { e.target.parentElement.innerHTML = '<div class=\'crc-cover-default\'><i class=\'el-icon\' style=\'font-size: 40px; color: rgba(255, 255, 255, 0.7);\'><svg viewBox=\'0 0 1024 1024\' xmlns=\'http://www.w3.org/2000/svg\'><path fill=\'currentColor\' d=\'M128 128h768v768H128V128zm64 64v640h640V192H192zM320 320h384v64H320v-64zm0 192h384v64H320v-64zm0 192h256v64H320v-64z\'></path></svg></i></div>' }" />
                   <div v-else class="crc-cover-default"><el-icon size="40" color="rgba(255,255,255,0.7)"><Reading /></el-icon></div>
                 </div>
                 <div class="crc-body">
@@ -223,11 +223,11 @@ import { useAuthStore } from '@/stores/auth'
 import { getMyCourses } from '@/api/course'
 import type { MyCourseItem } from '@/api/course'
 import {
-  getMyProfile, getGrowthTrack, getLearningStatistics,
+  getMyProfile, getRadarData, getGrowthTrack, getLearningStatistics,
   calculateMyProfile, generateCourseReport, getCourseReportList,
   getReportDownloadUrl, getAllReportList,
 } from '@/api/report'
-import type { ProfileResponse, StatisticsResponse, ReportDTO } from '@/api/report'
+import type { ProfileResponse, RadarDataResponse, StatisticsResponse, ReportDTO } from '@/api/report'
 import { ElMessage } from 'element-plus'
 import {
   DataAnalysis, Comment, Finished, Trophy, Medal,
@@ -235,7 +235,7 @@ import {
 } from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()
-const RADAR_COLORS = ['#d32f2f', '#f57c00', '#388e3c', '#1976d2', '#7b1fa2']
+const RADAR_COLORS = ['#d32f2f', '#f57c00', '#388e3c', '#1976d2', '#7b1fa2', '#673ab7']
 
 // ──── 列表数据 ────
 const myCourseOptions = ref<MyCourseItem[]>([])
@@ -293,20 +293,19 @@ const calculating = ref(false)
 const generating = ref(false)
 let reportPollTimer: number | null = null
 
-const DIMENSION_KEYS = ['theoreticalLiteracy', 'practicalAbility', 'valueIdentity', 'innovativeThinking', 'socialResponsibility']
-const DIMENSION_NAMES = ['理论素养', '实践能力', '价值认同', '创新思维', '社会责任感']
-const DIMENSION_DESCS = [
-  '课程理论学习深度与广度', '实践任务参与及完成情况',
-  '价值观认同与思政认识', '创新思维培养与发散能力', '社会责任感与公民意识',
-]
+const radarData = ref<RadarDataResponse | null>(null)
 
-const dimensions = computed(() =>
-  DIMENSION_KEYS.map((k, i) => ({
-    name: DIMENSION_NAMES[i],
-    score: Math.round(((profile.value?.[k as keyof ProfileResponse] as number) ?? 0) * 100) / 100,
-    desc: DIMENSION_DESCS[i],
-  })),
-)
+const dimensions = computed(() => {
+  if (radarData.value?.dimensions) {
+    return radarData.value.dimensions.map(d => ({
+      name: d.name,
+      score: d.score,
+      desc: '' // 描述可以设为空，或者根据名称映射
+    }))
+  }
+  // 默认空数据
+  return []
+})
 
 function currentCourseId() {
   if (authStore.isStudent) return '0' // 学生全局画像使用伪造全局 ID
@@ -320,6 +319,7 @@ async function openDetailForStudent() {
     const cid = '0'
     await Promise.all([
       getMyProfile(cid).then(r => { profile.value = r }).catch(() => { profile.value = null }),
+      getRadarData(cid).then(r => { radarData.value = r }).catch(() => { radarData.value = null }),
       getLearningStatistics(cid).then(r => { stats.value = r }).catch(() => { stats.value = null }),
       fetchGrowthTrack(),
     ])
@@ -359,6 +359,7 @@ async function doCalculate() {
   try {
     await calculateMyProfile(currentCourseId())
     profile.value = await getMyProfile(currentCourseId())
+    radarData.value = await getRadarData(currentCourseId())
     initRadarChart()
     ElMessage.success('评估已更新')
   } finally { calculating.value = false }
@@ -405,13 +406,13 @@ const radarChartRef = ref<HTMLDivElement | null>(null)
 let radarChart: ECharts | null = null
 
 function initRadarChart() {
-  if (!radarChartRef.value || !authStore.isStudent) return
+  if (!radarChartRef.value || !authStore.isStudent || !dimensions.value.length) return
   if (!radarChart) radarChart = echarts.init(radarChartRef.value)
   radarChart.setOption({
     tooltip: { trigger: 'item' },
     radar: {
       shape: 'circle',
-      indicator: DIMENSION_NAMES.map(n => ({ name: n, max: 100 })),
+      indicator: dimensions.value.map(d => ({ name: d.name, max: 100 })),
       axisLine: { lineStyle: { color: '#cfd8dc' } },
       splitLine: { lineStyle: { color: '#eceff1' } },
       name: { color: '#546e7a', fontWeight: 'bold', fontSize: 12 },
@@ -431,7 +432,7 @@ function initRadarChart() {
 
 const lineChartRef = ref<HTMLDivElement | null>(null)
 let lineChart: ECharts | null = null
-const growthData = ref<{ dates: string[]; totalScores: number[] }>({ dates: [], totalScores: [] })
+const growthData = ref<GrowthTrackResponse | null>(null)
 
 async function fetchGrowthTrack() {
   try {
@@ -444,7 +445,8 @@ async function fetchGrowthTrack() {
 function initLineChart() {
   if (!lineChartRef.value) return
   if (!lineChart) lineChart = echarts.init(lineChartRef.value)
-  const { dates, totalScores } = growthData.value
+  const dates = growthData.value?.trackData?.map(p => p.date) || []
+  const totalScores = growthData.value?.trackData?.map(p => p.totalScore) || []
   lineChart.setOption({
     tooltip: { trigger: 'axis' },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },

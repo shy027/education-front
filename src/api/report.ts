@@ -20,15 +20,39 @@ export interface ProfileResponse {
   updatedTime: string
 }
 
+export interface DimensionData {
+  name: string
+  score: number
+  maxScore: number
+}
+
 export interface RadarDataResponse {
-  dimensions: string[]
-  scores: number[]
-  classAvg: number[]
+  userId: string
+  courseId: string
+  dimensions: DimensionData[]
+  totalScore: number
+  level: string
+  growthTrend: string
+  updatedTime: string
+}
+
+export interface TrackPoint {
+  date: string
+  totalScore: number
+  dimension1Score: number
+  dimension2Score: number
+  dimension3Score: number
+  dimension4Score: number
+  dimension5Score: number
+  dimension6Score: number
 }
 
 export interface GrowthTrackResponse {
-  dates: string[]
-  totalScores: number[]
+  userId: string
+  courseId: string
+  trackData: TrackPoint[]
+  improvement?: number
+  trend?: string
 }
 
 export interface StatisticsResponse {

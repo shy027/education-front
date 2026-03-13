@@ -362,7 +362,7 @@ function trackView() {
       userId: authStore.userInfo.userId,
       courseId: '0',          // 资源库无课程上下文，传 0
       behaviorType: 'RESOURCE_VIEW',
-      targetId: resourceId.value,
+      behaviorObjectId: resourceId.value,
     }).catch(() => { /* 静默失败，不影响主流程 */ })
   }
 }
@@ -380,7 +380,7 @@ function handleFileDownload(url: string, name: string) {
       userId: authStore.userInfo.userId,
       courseId: '0',
       behaviorType: 'RESOURCE_DOWNLOAD',
-      targetId: resourceId.value,
+      behaviorObjectId: resourceId.value,
     }).catch(() => {})
   }
 

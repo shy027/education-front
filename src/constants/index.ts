@@ -118,6 +118,7 @@ export const SCHOOL_LEADER_MENUS = [
   { title: '数据看板', icon: 'DataBoard', path: '/admin/dashboard' },
   { title: '内容审核', icon: 'CircleCheckFilled', path: '/admin/audit' },
   { title: '报告管理', icon: 'Document', path: '/admin/reports' },
+  { title: '素养看板', icon: 'DataAnalysis', path: '/admin/student-literacy' },
 ]
 
 /** 后台侧边栏：超级管理员的后台菜单（全量） */
@@ -129,4 +130,6 @@ export const ADMIN_MENUS = [
   { title: '资源管理', icon: 'FolderOpened', path: '/admin/resources' },
   { title: '报告管理', icon: 'Document', path: '/admin/reports' },
   { title: '学科管理', icon: 'FolderOpened', path: '/admin/subjects' },
+  { title: '素养配置', icon: 'Setting', path: '/admin/literacy-config' },
+  { title: '素养看板', icon: 'DataAnalysis', path: '/admin/student-literacy' },
 ]

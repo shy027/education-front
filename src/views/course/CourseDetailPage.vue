@@ -942,7 +942,7 @@ function openWare(w: CoursewareItem) {
       userId: authStore.userInfo.userId,
       courseId: courseId.value,
       behaviorType: behaviorType as 'WATCH_VIDEO' | 'READ_DOC',
-      targetId: w.id,
+      behaviorObjectId: w.id,
     }).catch(() => { /* 埋点静默失败，不影响主流程 */ })
   }
 }

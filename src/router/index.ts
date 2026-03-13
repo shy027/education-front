@@ -188,6 +188,18 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/admin/SubjectManagePage.vue'),
         meta: { title: '学科分类管理', icon: 'FolderOpened', roles: ['ADMIN'] },
       },
+      {
+        path: 'literacy-config',
+        name: 'AdminLiteracyConfig',
+        component: () => import('@/views/admin/LiteracyConfig.vue'),
+        meta: { title: '素养配置管理', icon: 'Setting', roles: ['ADMIN'] },
+      },
+      {
+        path: 'student-literacy',
+        name: 'AdminStudentLiteracy',
+        component: () => import('@/views/admin/StudentLiteracyList.vue'),
+        meta: { title: '学生素养看板', icon: 'DataAnalysis', roles: ['ADMIN', 'SCHOOL_LEADER'] },
+      },
     ],
   },
 

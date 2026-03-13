@@ -89,9 +89,9 @@ export interface BehaviorLogReq {
   userId: string
   courseId: string
   behaviorType: 'WATCH_VIDEO' | 'READ_DOC' | 'POST_COMMENT' | 'SUBMIT_ANSWER' | 'GROUP_DISCUSS' | 'RESOURCE_VIEW'
-  targetId?: string
-  duration?: number
-  extra?: string
+  behaviorObjectId?: string
+  durationSeconds?: number
+  behaviorData?: string
 }
 
 // ===================== 行为埋点 =====================
@@ -107,6 +107,9 @@ export const getMyProfile = (courseId: string) =>
 export const getUserProfile = (userId: string, courseId: string) =>
   silentGet<ProfileResponse>(`/v1/profiles/${userId}`, { courseId })
 
+export const getProfileList = (params: PageQuery & { courseId?: string }) =>
+  get<PageResponse<ProfileResponse>>('/v1/profiles', params)
+
 export const getRadarData = (courseId: string) =>
   silentGet<RadarDataResponse>('/v1/profiles/radar', { courseId })
 
@@ -118,6 +121,9 @@ export const getLearningStatistics = (courseId: string, days = 30) =>
 
 export const calculateMyProfile = (courseId: string) =>
   post<void>('/v1/profiles/calculate/user', null, { params: { courseId } })
+
+export const recalculateAllProfiles = (courseId: string | number) =>
+  post<void>('/v1/profiles/calculate', null, { params: { courseId } })
 
 // ===================== 报告管理 =====================
 
@@ -152,3 +158,18 @@ export const getThresholdsConfig = () =>
 
 export const updateThresholdsConfig = (data: { excellent: number; good: number; pass: number }) =>
   put<void>('/v1/admin/config/thresholds', data)
+
+export const getScoreConfig = () =>
+  get<Record<string, number>>('/v1/admin/config/score-config')
+
+export const updateScoreConfig = (data: Record<string, number>) =>
+  put<void>('/v1/admin/config/score-config', data)
+
+export const getTagWeights = () =>
+  get<Record<string, any>>('/v1/admin/config/tag-weights')
+
+export const updateTagWeights = (data: Record<string, any>) =>
+  put<void>('/v1/admin/config/tag-weights', { tagConfigs: data })
+
+export const refreshConfigCache = (configKey: string) =>
+  post<void>('/v1/admin/config/refresh', null, { params: { configKey } })

@@ -38,6 +38,7 @@ import { useRoute } from 'vue-router'
 import {
   Reading, House, ChatDotRound, FolderOpened, DataLine, User,
   DataBoard, UserFilled, OfficeBuilding, CircleCheckFilled, Document,
+  Setting, DataAnalysis,
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { SCHOOL_LEADER_MENUS, ADMIN_MENUS } from '@/constants'
@@ -71,6 +72,8 @@ const iconMap: Record<string, ReturnType<typeof markRaw>> = {
   OfficeBuilding: markRaw(OfficeBuilding),
   CircleCheckFilled: markRaw(CircleCheckFilled),
   Document: markRaw(Document),
+  Setting: markRaw(Setting),
+  DataAnalysis: markRaw(DataAnalysis),
 }
 </script>
 

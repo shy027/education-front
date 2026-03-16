@@ -86,10 +86,10 @@ export interface ReportStatusResponse {
 }
 
 export interface BehaviorLogReq {
-  userId: string
-  courseId: string
-  behaviorType: 'WATCH_VIDEO' | 'READ_DOC' | 'POST_COMMENT' | 'SUBMIT_ANSWER' | 'GROUP_DISCUSS' | 'RESOURCE_VIEW'
-  behaviorObjectId?: string
+  userId?: string // 后端通常从 Token 获取，前台不必传
+  courseId: string | number
+  behaviorType: 'WATCH_VIDEO' | 'READ_DOC' | 'POST_COMMENT' | 'SUBMIT_ANSWER' | 'SUBMIT_TASK' | 'GROUP_DISCUSS' | 'RESOURCE_VIEW'
+  behaviorObjectId?: string | number
   durationSeconds?: number
   behaviorData?: string
 }

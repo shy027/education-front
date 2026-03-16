@@ -193,6 +193,13 @@
               <div class="task-actions">
                 <el-tag v-if="!isMyTeaching" size="small">{{ t.submitCount }} 人参与</el-tag>
                 <el-button v-if="isMyTeaching && !isCourseFinished" text type="danger" size="small" @click="deleteTaskById(t.id)">删除</el-button>
+                <!-- 临时测试功能：学生手动完成任务 -->
+                <el-button 
+                  v-if="!isMyTeaching && isMember && !isCourseFinished" 
+                  type="success" 
+                  size="small" 
+                  @click="handleCompleteTestTask(t)"
+                >完成 (测试)</el-button>
               </div>
             </div>
           </div>
@@ -1237,6 +1244,43 @@ async function handleCreateTask() {
     if (course.value) course.value.taskCount = (course.value.taskCount || 0) + 1
   } finally {
     taskSubmitting.value = false
+  }
+}
+
+// 临时测试功能：手动完成任务并计分
+async function handleCompleteTestTask(task: any) {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入该任务的测试得分 (0-' + (task.totalScore || 100) + ')', '临时测试：完成任务', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPattern: /^\d+(\.\d+)?$/,
+      inputErrorMessage: '请输入数字分值'
+    })
+
+    if (value === null || value === '') return
+
+    const score = parseFloat(value)
+    if (score > (task.totalScore || 100)) {
+      return ElMessage.warning('得分不能超过总分')
+    }
+
+    await logBehavior({
+      courseId: course.value.id,
+      behaviorType: 'SUBMIT_TASK',
+      behaviorObjectId: task.id,
+      behaviorData: JSON.stringify({
+        score: score,
+        total: task.totalScore || 100,
+        taskTitle: task.taskTitle
+      })
+    })
+
+    ElMessage.success('任务完成行为上报成功！素养得分已触发重计。')
+  } catch (err) {
+    if (err !== 'cancel') {
+      console.error('Report task behavior failed:', err)
+      ElMessage.error('上报失败')
+    }
   }
 }
 

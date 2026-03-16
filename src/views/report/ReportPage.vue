@@ -54,7 +54,7 @@
                   <div class="dimension-header">
                     <span class="dimension-dot" :style="{ background: RADAR_COLORS[idx] }" />
                     <span class="dimension-name">{{ d.name }}</span>
-                    <span class="dimension-score">{{ d.score }}%</span>
+                    <span class="dimension-score">{{ d.score.toFixed(1) }}</span>
                   </div>
                   <el-progress :percentage="d.score" :stroke-width="6" :show-text="false" :color="RADAR_COLORS[idx]" />
                   <div class="dimension-desc">{{ d.desc }}</div>
@@ -409,7 +409,20 @@ function initRadarChart() {
   if (!radarChartRef.value || !authStore.isStudent || !dimensions.value.length) return
   if (!radarChart) radarChart = echarts.init(radarChartRef.value)
   radarChart.setOption({
-    tooltip: { trigger: 'item' },
+    tooltip: {
+      trigger: 'item',
+      formatter: (params: any) => {
+        const list = dimensions.value;
+        let str = `<div style="font-weight: bold; margin-bottom: 4px;">${params.name}</div>`;
+        list.forEach((d, i) => {
+          str += `<div style="display: flex; justify-content: space-between; gap: 20px;">
+                    <span>${d.name}:</span>
+                    <span style="font-weight: bold;">${params.value[i]}</span>
+                  </div>`;
+        });
+        return str;
+      }
+    },
     radar: {
       shape: 'circle',
       indicator: dimensions.value.map(d => ({ name: d.name, max: 100 })),
@@ -451,7 +464,7 @@ function initLineChart() {
     tooltip: { trigger: 'axis' },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
     xAxis: { type: 'category', data: dates.length ? dates : ['暂无数据'], boundaryGap: false },
-    yAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}%' } },
+    yAxis: { type: 'value', min: 0, max: 100, axisLabel: { formatter: '{value}' } },
     series: [{
       name: '综合得分', type: 'line', smooth: true,
       data: totalScores.length ? totalScores : [0],

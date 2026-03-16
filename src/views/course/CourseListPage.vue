@@ -6,7 +6,7 @@
         <h2 class="page-title">{{ authStore.isTeacher ? '课程管理' : '课程中心' }}</h2>
         <p class="page-desc">{{ authStore.isTeacher ? '管理您创建的课程，或浏览加入其他课程' : '发现并加入感兴趣的课程' }}</p>
       </div>
-      <el-button v-if="authStore.isTeacher" type="primary" :icon="Plus" class="create-btn" @click="showCreateDialog = true">
+      <el-button v-if="authStore.isTeacher" type="primary" :icon="Plus" class="create-btn" :loading="creating" @click="handleCreate">
         创建课程
       </el-button>
     </div>
@@ -147,69 +147,6 @@
       />
     </div>
 
-    <!-- 创建课程对话框（教师专属） -->
-    <el-dialog
-      v-model="showCreateDialog"
-      title="创建课程"
-      width="520px"
-      :close-on-click-modal="false"
-      @closed="resetCreateForm"
-    >
-      <el-form
-        ref="createFormRef"
-        :model="createForm"
-        :rules="createRules"
-        label-width="90px"
-        size="large"
-      >
-        <el-form-item label="课程名称" prop="courseName">
-          <el-input v-model="createForm.courseName" placeholder="请输入课程名称" clearable maxlength="50" show-word-limit />
-        </el-form-item>
-        <el-form-item label="课程简介">
-          <el-input v-model="createForm.description" type="textarea" placeholder="请输入课程简介" :rows="3" maxlength="200" show-word-limit />
-        </el-form-item>
-        <el-form-item label="学科领域">
-          <el-select v-model="createForm.subjectArea" placeholder="请选择学科领域" clearable>
-            <el-option
-              v-for="s in subjectAreaOptions"
-              :key="s"
-              :label="s"
-              :value="s"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="加入方式" prop="joinType">
-          <el-radio-group v-model="createForm.joinType">
-            <el-radio :value="1">公开加入</el-radio>
-            <el-radio :value="2">审批加入</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="开课时间" prop="startTime">
-          <el-date-picker
-            v-model="createForm.startTime"
-            type="datetime"
-            placeholder="选择开课时间"
-            value-format="YYYY-MM-DD HH:mm:ss"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="结课时间" prop="endTime">
-          <el-date-picker
-            v-model="createForm.endTime"
-            type="datetime"
-            placeholder="选择结课时间 (可选，不填表示不结课)"
-            value-format="YYYY-MM-DD HH:mm:ss"
-            style="width: 100%"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showCreateDialog = false">取消</el-button>
-        <el-button type="primary" :loading="creating" class="red-confirm-btn" @click="handleCreate">
-          创建
-        </el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -317,6 +254,20 @@ async function fetchList() {
         filteredList = filteredList.filter((c) => getCalculatedStatus(c) === statusMap[query.status as number])
       }
       
+      // 排序优先级: 草稿(-1)、审核中(0) 优先，其余按创建时间倒序
+      filteredList.sort((a, b) => {
+        const getPriority = (c: any) => {
+          if (c.auditStatus === -1) return 0
+          if (c.auditStatus === 0) return 1
+          if (c.auditStatus === 2) return 2 // 已拒绝排在前面也合理
+          return 3
+        }
+        const pa = getPriority(a)
+        const pb = getPriority(b)
+        if (pa !== pb) return pa - pb
+        return new Date(b.createdTime || 0).getTime() - new Date(a.createdTime || 0).getTime()
+      })
+      
       total.value = filteredList.length
       
       // 客户端分页
@@ -361,17 +312,21 @@ function switchTab(tab: 'all' | 'mine') {
 
 // ───── 标签显示 ─────
 /** 综合计算课程状态 */
-function getCalculatedStatus(c: CourseItem): 'audit' | 'notStarted' | 'ongoing' | 'finished' {
-  if (c.auditStatus === 0) return 'audit' // 审核中
+function getCalculatedStatus(c: CourseItem): 'draft' | 'audit' | 'rejected' | 'notStarted' | 'ongoing' | 'finished' {
+  if (c.auditStatus === -1) return 'draft'
+  if (c.auditStatus === 0) return 'audit'
+  if (c.auditStatus === 2) return 'rejected'
   const now = new Date()
-  if (c.startTime && new Date(c.startTime) > now) return 'notStarted' // 暂未开放
-  if (c.endTime && new Date(c.endTime) < now) return 'finished' // 已结课
-  return 'ongoing' // 进行中
+  if (c.startTime && new Date(c.startTime) > now) return 'notStarted'
+  if (c.endTime && new Date(c.endTime) < now) return 'finished'
+  return 'ongoing'
 }
 
 function statusType(c: CourseItem): '' | 'info' | 'success' | 'warning' | 'danger' {
   const s = getCalculatedStatus(c)
+  if (s === 'draft') return 'info'
   if (s === 'audit') return 'warning'
+  if (s === 'rejected') return 'danger'
   if (s === 'notStarted') return 'info'
   if (s === 'ongoing') return 'success'
   if (s === 'finished') return 'info'
@@ -383,7 +338,9 @@ function joinTypeLabel(t: number): string { return ({ 1: '公开加入', 2: '审
 
 function statusLabel(c: CourseItem): string {
   const s = getCalculatedStatus(c)
+  if (s === 'draft') return '草稿'
   if (s === 'audit') return '审核中'
+  if (s === 'rejected') return '已拒绝'
   if (s === 'notStarted') return '暂未开放'
   if (s === 'ongoing') return '进行中'
   if (s === 'finished') return '已结课'
@@ -403,37 +360,9 @@ async function handleJoin(course: CourseItem & { _joining?: boolean }) {
   }
 }
 
-// ───── 创建课程 ─────
-const showCreateDialog = ref(false)
 const creating = ref(false)
-const createFormRef = ref<FormInstance>()
-
-const createForm = reactive<CourseCreateReq>({
-  courseName: '',
-  description: '',
-  subjectArea: '',
-  joinType: 1,
-  startTime: '',
-  endTime: '',
-})
-
-const createRules: FormRules = {
-  courseName: [
-    { required: true, message: '请输入课程名称', trigger: 'blur' },
-    { max: 50, message: '课程名称不超过 50 个字符', trigger: 'blur' },
-  ],
-  joinType: [{ required: true, message: '请选择加入方式', trigger: 'change' }],
-  startTime: [{ required: true, message: '请选择开课时间', trigger: 'change' }],
-}
-
-function resetCreateForm() {
-  Object.assign(createForm, { courseName: '', description: '', subjectArea: '', joinType: 1, startTime: '', endTime: '' })
-  createFormRef.value?.clearValidate()
-}
 
 async function handleCreate() {
-  if (!(await createFormRef.value?.validate().catch(() => false))) return
-  
   if (!authStore.userInfo?.schoolId) {
     ElMessage.error('该账号未绑定学校，无法创建课程')
     return
@@ -442,13 +371,16 @@ async function handleCreate() {
   creating.value = true
   try {
     const courseId = await createCourse({
-      ...createForm,
-      subjectArea: createForm.subjectArea || undefined,
-      schoolId: authStore.userInfo.schoolId // 加上必填的 schoolId
+      courseName: '', // 空记录
+      schoolId: authStore.userInfo.schoolId,
+      joinType: 1,
+      dimensionWeights: '{}',
+      scoringConfig: '{}'
     })
-    ElMessage.success('课程创建成功')
-    showCreateDialog.value = false
+    ElMessage.success('已进入课程编辑模式')
     router.push(`/course/${courseId}`)
+  } catch (err) {
+    ElMessage.error('创建失败')
   } finally {
     creating.value = false
   }
@@ -642,6 +574,37 @@ onMounted(() => {
 .pagination-wrap { display: flex; justify-content: center; padding: 8px 0; }
 
 /* ===== 对话框确认按钮 ===== */
+/* ===== 对话框内计分配置 ===== */
+.scoring-config-tip { margin-bottom: 16px; }
+.dimension-checkbox-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0;
+}
+:deep(.el-checkbox-group) {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+.dim-checkbox {
+  margin: 0 !important;
+  width: 100%;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+.dim-checkbox:hover { border-color: #ffcdd2; background: #fff8f8; }
+:deep(.el-checkbox.is-bordered.is-checked) {
+  border-color: #d32f2f;
+  background: #ffebee;
+}
+:deep(.el-checkbox.is-bordered.is-checked .el-checkbox__label) { color: #d32f2f; font-weight: 600; }
+:deep(.el-checkbox__input.is-checked .el-checkbox__inner) { background-color: #d32f2f; border-color: #d32f2f; }
+
 :deep(.red-confirm-btn) {
   background: linear-gradient(135deg, #ff5252, #d32f2f) !important;
   border: none !important;

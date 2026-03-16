@@ -171,5 +171,11 @@ export const getTagWeights = () =>
 export const updateTagWeights = (data: Record<string, any>) =>
   put<void>('/v1/admin/config/tag-weights', { tagConfigs: data })
 
+export const getBehaviorWeights = () =>
+  get<Record<string, number>>('/v1/admin/config/behavior-weights')
+
+export const updateBehaviorWeights = (data: Record<string, number>) =>
+  put<void>('/v1/admin/config/behavior-weights', data)
+
 export const refreshConfigCache = (configKey: string) =>
   post<void>('/v1/admin/config/refresh', null, { params: { configKey } })

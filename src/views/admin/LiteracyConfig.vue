@@ -117,10 +117,34 @@
               <el-input-number v-model="scoreConfig.resource_cap" :min="0" :max="100" />
             </el-form-item>
             <el-form-item label="单资源浏览分">
-              <el-input-number v-model="scoreConfig.resource_view_point" :precision="1" :step="0.5" :min="0" />
+              <el-input-number v-model="scoreConfig.resource_view_point" :precision="1" :step="0.1" :min="0" />
             </el-form-item>
           </el-form>
           <p class="hint">建议：上限总和为 100</p>
+        </el-card>
+
+        <!-- 课程行为基础分 -->
+        <el-card class="config-card mt-20" shadow="never">
+          <template #header>
+            <div class="card-header">
+              <span><el-icon><EditPen /></el-icon> 课程行为基础分</span>
+            </div>
+          </template>
+          <el-form label-width="120px" size="small">
+            <el-form-item label="查看课件">
+              <el-input-number v-model="behaviorWeights.VIEW_COURSEWARE" :min="0" :max="100" />
+            </el-form-item>
+            <el-form-item label="提交任务(基础)">
+              <el-input-number v-model="behaviorWeights.SUBMIT_TASK" :min="0" :max="100" />
+            </el-form-item>
+            <el-form-item label="回复讨论">
+              <el-input-number v-model="behaviorWeights.POST_COMMENT" :min="0" :max="100" />
+            </el-form-item>
+            <el-form-item label="话题加精(格外)">
+              <el-input-number v-model="behaviorWeights.ESSENCE_POST" :min="0" :max="100" />
+            </el-form-item>
+          </el-form>
+          <p class="hint">注：加分将全额叠加至课程选中的所有维度</p>
         </el-card>
       </el-col>
 
@@ -139,9 +163,18 @@
                 <el-input-number v-model="row.max_score" :min="0" :max="100" controls-position="right" size="small" style="width: 80px" />
               </template>
             </el-table-column>
-            <el-table-column v-for="i in 6" :key="i" :label="dimensionNames['dimension' + i] || ('D'+i)" min-width="130">
+            <el-table-column v-for="i in 6" :key="i" :label="dimensionNames['dimension' + i] || ('D'+i)" min-width="120" align="center">
               <template #default="{ row }">
-                <el-rate v-model="row.weights['dimension' + i]" :max="5" size="small" />
+                <el-input-number 
+                  v-model="row.weights['dimension' + i]" 
+                  :precision="2" 
+                  :step="0.1" 
+                  :min="0" 
+                  :max="1" 
+                  controls-position="right"
+                  size="small"
+                  class="weight-input"
+                />
               </template>
             </el-table-column>
           </el-table>
@@ -155,13 +188,14 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
-  Refresh, Select, Odometer, Rank, Connection, CollectionTag, DataAnalysis 
+  Refresh, Select, Odometer, Rank, Connection, CollectionTag, DataAnalysis, EditPen
 } from '@element-plus/icons-vue'
 import {
   getWeightsConfig, updateWeightsConfig,
   getThresholdsConfig, updateThresholdsConfig,
   getScoreConfig, updateScoreConfig,
   getTagWeights, updateTagWeights,
+  getBehaviorWeights, updateBehaviorWeights,
   refreshConfigCache, recalculateAllProfiles
 } from '@/api/report'
 
@@ -182,6 +216,9 @@ const dimensionNames = ref<Record<string, string>>({
 const weights = ref<Record<string, number>>({})
 const thresholds = ref({ excellent: 90, good: 80, pass: 60 })
 const scoreConfig = ref({ course_cap: 80, resource_cap: 20, resource_view_point: 2.0 })
+const behaviorWeights = ref<Record<string, number>>({ 
+    VIEW_COURSEWARE: 2, SUBMIT_TASK: 10, POST_COMMENT: 2, ESSENCE_POST: 5 
+})
 const tagList = ref<any[]>([])
 
 // 计算权重总和 (处理浮点数精度)
@@ -217,11 +254,12 @@ const configErrors = computed(() => {
 // ───── 加载数据 ─────
 async function fetchData() {
   try {
-    const [w, t, s, tags] = await Promise.all([
+    const [w, t, s, tags, b] = await Promise.all([
       getWeightsConfig(),
       getThresholdsConfig(),
       getScoreConfig(),
-      getTagWeights()
+      getTagWeights(),
+      getBehaviorWeights()
     ])
     
     // 1. 标准化维度权重 (用户要求：读取什么就是什么，不强制设 0)
@@ -243,6 +281,14 @@ async function fetchData() {
         course_cap: s.course_cap ?? s.courseCap ?? null,
         resource_cap: s.resource_cap ?? s.resourceCap ?? null,
         resource_view_point: s.resource_view_point ?? s.resourceViewPoint ?? null
+    }
+    
+    // 3.5 行为权重
+    behaviorWeights.value = {
+        VIEW_COURSEWARE: b.VIEW_COURSEWARE ?? 0,
+        SUBMIT_TASK: b.SUBMIT_TASK ?? 0,
+        POST_COMMENT: b.POST_COMMENT ?? b.POST_REPLY ?? 0,
+        ESSENCE_POST: b.ESSENCE_POST ?? 0
     }
     
     // 4. 转换标签 Map 为列表
@@ -276,7 +322,8 @@ async function handleRefreshCache() {
       refreshConfigCache('profile.dimension_weights'),
       refreshConfigCache('profile.level_thresholds'),
       refreshConfigCache('profile.score_config'),
-      refreshConfigCache('profile.resource_tag_weights')
+      refreshConfigCache('profile.resource_tag_weights'),
+      refreshConfigCache('profile.behavior_weights')
     ])
     ElMessage.success('配置缓存已刷新，计算引擎已同步最新参数')
   } finally {
@@ -335,7 +382,8 @@ async function handleSaveAll() {
       updateWeightsConfig(weights.value),
       updateThresholdsConfig(thresholds.value),
       updateScoreConfig(scoreConfig.value),
-      updateTagWeights(tagWeightsData)
+      updateTagWeights(tagWeightsData),
+      updateBehaviorWeights(behaviorWeights.value)
     ])
     
     ElMessage.success('所有配置已成功保存')
@@ -404,7 +452,7 @@ onMounted(fetchData)
   font-size: 13px;
 }
 
-:deep(.el-rate) {
-  --el-rate-icon-size: 14px;
+.weight-input {
+  width: 90px;
 }
 </style>

@@ -9,8 +9,11 @@
       <div class="hero-info">
         <div class="hero-badges">
           <el-tag size="small" :type="statusType(course)">{{ statusLabel(course) }}</el-tag>
-          <el-tag size="small" type="info">{{ joinTypeLabel(course.joinType) }}</el-tag>
-          <el-tag v-if="course.subjectArea" size="small">{{ course.subjectArea }}</el-tag>
+          <!-- 仅在非草稿状态显示加入方式和领域，使其在创建初期显得更“净” -->
+          <template v-if="course.auditStatus !== -1">
+            <el-tag size="small" type="info">{{ joinTypeLabel(course.joinType) }}</el-tag>
+            <el-tag v-if="course.subjectArea" size="small">{{ course.subjectArea }}</el-tag>
+          </template>
         </div>
         <h1 class="hero-title">{{ course.courseName }}</h1>
         <p class="hero-desc">{{ course.courseIntro || '暂无课程介绍' }}</p>
@@ -35,11 +38,34 @@
             :loading="quitting"
             @click="handleQuit"
           >退出课程</el-button>
-          <el-button
-            v-if="authStore.isTeacher && isMyTeaching && !isCourseFinished"
-            :icon="Edit"
-            @click="showEditDialog = true"
-          >编辑课程</el-button>
+          <template v-if="authStore.isTeacher && isMyTeaching">
+            <!-- 草稿状态下的操作按钮 -->
+            <template v-if="course.auditStatus === -1 || course.auditStatus === 2">
+              <el-button 
+                type="warning" 
+                plain 
+                :icon="Edit" 
+                @click="showEditDialog = true"
+              >编辑信息</el-button>
+              <el-button 
+                type="success" 
+                :loading="submittingReview"
+                @click="handleSubmitReview"
+              >提交审核</el-button>
+              <el-button 
+                type="danger" 
+                plain 
+                @click="handleDeleteDraft"
+              >删除草稿</el-button>
+            </template>
+            <!-- 审核中状态：锁定编辑 -->
+            <el-button
+              v-else-if="course.auditStatus === 0"
+              disabled
+              :icon="Edit"
+            >审核中 (基础信息已锁定)</el-button>
+            <!-- 审核通过状态：编辑按钮消失 (符合需求: 审核通过一行的四个按钮全部消失) -->
+          </template>
         </div>
       </div>
     </div>
@@ -440,12 +466,43 @@
             <el-radio :value="2">审批加入</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="开课/结课时间" v-if="editForm.startTime || editForm.endTime">
-          <span style="color: #909399; font-size: 13px;">
-            {{ editForm.startTime || '未设置' }} 至 {{ editForm.endTime || '不限' }}
-            (不可修改)
-          </span>
+        <el-form-item label="开课时间" required>
+          <el-date-picker
+            v-model="editForm.startTime"
+            type="datetime"
+            placeholder="选择开课时间"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 100%"
+          />
         </el-form-item>
+        <el-form-item label="结课时间">
+          <el-date-picker
+            v-model="editForm.endTime"
+            type="datetime"
+            placeholder="选择结课时间 (可选)"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            style="width: 100%"
+          />
+        </el-form-item>
+
+        <!-- 素养评分配置 (简化版) -->
+        <el-divider>选择素养考核维度</el-divider>
+        <div class="scoring-config-tip">
+          <el-alert 
+            :title="isDimensionLocked ? '维度定义已由管理员锁定，如需修改请联系系统管理员。' : '请勾选该课程涉及的素养维度。课程产生的所有得分将自动均分给选中的维度。'" 
+            :type="isDimensionLocked ? 'warning' : 'info'" 
+            :closable="false" 
+            show-icon 
+          />
+        </div>
+        
+        <div class="dimension-checkbox-wrap">
+          <el-checkbox-group v-model="selectedDimensions" :disabled="isDimensionLocked">
+            <el-checkbox v-for="dim in dimensionList" :key="dim.key" :label="dim.key" border class="dim-checkbox">
+              {{ dim.name }}
+            </el-checkbox>
+          </el-checkbox-group>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="showEditDialog = false">取消</el-button>
@@ -548,7 +605,9 @@ import {
   type AnnouncementItem,
   type ChapterResourceItem,
   bindChapterResource,
-  unbindChapterResource
+  unbindChapterResource,
+  submitCourseForReview,
+  deleteCourseDraft
 } from '@/api/course'
 import type { PageResponse } from '@/types/api'
 import { getPostList, createPost, type PostItem } from '@/api/community'
@@ -591,8 +650,10 @@ const canInteract = computed(() => {
   return false
 })
 
-function getCalculatedStatus(c: CourseItem): 'audit' | 'notStarted' | 'ongoing' | 'finished' {
+function getCalculatedStatus(c: CourseItem): 'draft' | 'audit' | 'rejected' | 'notStarted' | 'ongoing' | 'finished' {
+  if (c.auditStatus === -1) return 'draft'
   if (c.auditStatus === 0) return 'audit'
+  if (c.auditStatus === 2) return 'rejected'
   const now = new Date()
   if (c.startTime && new Date(c.startTime) > now) return 'notStarted'
   if (c.endTime && new Date(c.endTime) < now) return 'finished'
@@ -601,7 +662,9 @@ function getCalculatedStatus(c: CourseItem): 'audit' | 'notStarted' | 'ongoing' 
 
 function statusType(c: CourseItem): undefined | 'info' | 'success' | 'warning' | 'danger' {
   const s = getCalculatedStatus(c)
+  if (s === 'draft') return 'info'
   if (s === 'audit') return 'warning'
+  if (s === 'rejected') return 'danger'
   if (s === 'notStarted') return 'info'
   if (s === 'ongoing') return 'success'
   if (s === 'finished') return 'info'
@@ -610,7 +673,9 @@ function statusType(c: CourseItem): undefined | 'info' | 'success' | 'warning' |
 
 function statusLabel(c: CourseItem): string {
   const s = getCalculatedStatus(c)
+  if (s === 'draft') return '草稿'
   if (s === 'audit') return '审核中'
+  if (s === 'rejected') return '已拒绝'
   if (s === 'notStarted') return '暂未开放'
   if (s === 'ongoing') return '进行中'
   if (s === 'finished') return '已结课'
@@ -650,24 +715,50 @@ async function handleQuit() {
 // ───── 课程基本信息编辑 ─────
 const editSubmitting = ref(false)
 const editForm = reactive({
-  courseName: '',
-  courseIntro: '',
-  courseCover: '',
-  joinType: 1,
   startTime: '',
   endTime: '',
+})
+
+// ───── 素养评分配置 ─────
+const dimensionList = [
+  { key: 'dimension1', name: '专业理论' },
+  { key: 'dimension2', name: '技术技能' },
+  { key: 'dimension3', name: '职业认同' },
+  { key: 'dimension4', name: '工艺创新' },
+  { key: 'dimension5', name: '社会责任' },
+  { key: 'dimension6', name: '持续发展' },
+]
+
+const selectedDimensions = ref<string[]>([])
+
+const isDimensionLocked = computed(() => {
+  return course.value?.isDimensionLocked === 1
 })
 
 function initEditForm() {
   if (course.value) {
     Object.assign(editForm, {
       courseName: course.value.courseName || '',
-      courseIntro: course.value.courseIntro || course.value.description || '', // 后端 CourseDetailResponse 实际返回的是 courseIntro
+      courseIntro: course.value.courseIntro || course.value.description || '',
       courseCover: course.value.courseCover || course.value.cover || '',
       joinType: course.value.joinType || 1,
       startTime: course.value.startTime || '',
       endTime: course.value.endTime || '',
     })
+
+    // 加载维度选中状态
+    if (course.value.dimensionWeights) {
+      try {
+        const weights = JSON.parse(course.value.dimensionWeights)
+        const selected: string[] = []
+        Object.keys(weights).forEach(key => {
+          if (weights[key] === 1) selected.push(key)
+        })
+        selectedDimensions.value = selected
+      } catch (e) { console.error('Parse dimensionWeights failed', e) }
+    } else {
+      selectedDimensions.value = []
+    }
   }
 }
 
@@ -693,13 +784,20 @@ async function handleEditCourse() {
   
   editSubmitting.value = true
   try {
+    const weights: Record<string, number> = {}
+    selectedDimensions.value.forEach(dim => { weights[dim] = 1 })
+
     await updateCourse({
       id: courseId.value,
       courseName: editForm.courseName,
       courseIntro: editForm.courseIntro, 
       courseCover: editForm.courseCover,
       joinType: editForm.joinType,
-      schoolId: authStore.userInfo?.schoolId ?? undefined
+      schoolId: authStore.userInfo?.schoolId ?? undefined,
+      startTime: editForm.startTime,
+      endTime: editForm.endTime || undefined,
+      dimensionWeights: JSON.stringify(weights),
+      scoringConfig: '{}' // 全局配置，发送空JSON对象以兼容MySQL JSON类型
     })
     ElMessage.success('保存成功')
     showEditDialog.value = false
@@ -710,12 +808,55 @@ async function handleEditCourse() {
   }
 }
 
+const submittingReview = ref(false)
+
+async function handleSubmitReview() {
+  if (!course.value?.courseName) {
+    ElMessage.warning('课程名称不能为空，请先编辑信息')
+    return
+  }
+  
+  await ElMessageBox.confirm('提交审核后，课程基本信息将锁定，确定提交吗？', '确认提交', {
+    type: 'warning',
+    confirmButtonText: '确定提交',
+    cancelButtonText: '取消'
+  })
+
+  submittingReview.value = true
+  try {
+    await submitCourseForReview(courseId.value)
+    ElMessage.success('提交审核成功')
+    // 重新加载课程信息以刷新状态
+    course.value = await getCourseDetail(courseId.value)
+  } catch (err: any) {
+    ElMessage.error(err.message || '提交失败')
+  } finally {
+    submittingReview.value = false
+  }
+}
+
+async function handleDeleteDraft() {
+  await ElMessageBox.confirm('确定要删除这篇课程草稿吗？删除后不可恢复。', '确认删除', {
+    type: 'error',
+    confirmButtonText: '删除',
+    cancelButtonText: '取消'
+  })
+
+  try {
+    await deleteCourseDraft(courseId.value)
+    ElMessage.success('草稿已删除')
+    router.replace('/course')
+  } catch (err) {
+    ElMessage.error('删除失败')
+  }
+}
+
 // ───── Tab ─────
 const activeTab = ref('ware')
 
 function onTabChange(tab: any) {
   if (tab.paneName === 'task' && !tasks.value.length) fetchTasks()
-  if (tab.paneName === 'discuss' && !posts.value.records.length) fetchPosts()
+  if (tab.paneName === 'discuss' && !posts.value.list.length) fetchPosts()
   if (tab.paneName === 'notice' && !announcements.value.length) fetchAnnouncements()
 }
 
@@ -1454,6 +1595,37 @@ onMounted(async () => {
 .notice-full-content { font-size: 14px; color: #37474f; line-height: 1.8; white-space: pre-wrap; }
 
 /* ===== 确认按钮 ===== */
+/* ===== 对话框内计分配置 ===== */
+.scoring-config-tip { margin-bottom: 16px; }
+.dimension-checkbox-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0;
+}
+:deep(.el-checkbox-group) {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+.dim-checkbox {
+  margin: 0 !important;
+  width: 100%;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+.dim-checkbox:hover { border-color: #ffcdd2; background: #fff8f8; }
+:deep(.el-checkbox.is-bordered.is-checked) {
+  border-color: #d32f2f;
+  background: #ffebee;
+}
+:deep(.el-checkbox.is-bordered.is-checked .el-checkbox__label) { color: #d32f2f; font-weight: 600; }
+:deep(.el-checkbox__input.is-checked .el-checkbox__inner) { background-color: #d32f2f; border-color: #d32f2f; }
+
 :deep(.red-confirm-btn) {
   background: linear-gradient(135deg, #ff5252, #d32f2f) !important;
   border: none !important;

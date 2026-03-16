@@ -17,6 +17,8 @@ export interface CourseCreateReq {
   schoolId?: string | number
   startTime?: string
   endTime?: string
+  dimensionWeights?: string   // JSON string
+  scoringConfig?: string      // JSON string
 }
 
 export interface CourseItem {
@@ -170,6 +172,12 @@ export const updateCourseStatus = (id: string, status: number) =>
 
 export const getMyCourses = () =>
   get<MyCoursesResponse>('/v1/courses/my-courses')
+
+export const submitCourseForReview = (id: string) =>
+  post<void>(`/v1/courses/${id}/review`)
+
+export const deleteCourseDraft = (id: string) =>
+  del<void>(`/v1/courses/${id}`)
 
 // ===================== 章节 =====================
 

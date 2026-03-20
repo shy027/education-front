@@ -317,7 +317,7 @@
         
         <el-table 
           :data="availableResources" 
-          height="400" 
+          height="350" 
           border 
           @row-click="handleResourceRowClick"
           :row-style="{ cursor: 'pointer' }"
@@ -329,12 +329,6 @@
             </template>
           </el-table-column>
           <el-table-column property="categoryName" label="分类" width="100" show-overflow-tooltip />
-          <el-table-column label="标签" min-width="120" show-overflow-tooltip>
-            <template #default="{ row }">
-              {{ row.tags?.map((t: any) => t.tagName).join(', ') || '—' }}
-            </template>
-          </el-table-column>
-          <el-table-column property="viewCount" label="浏览量" width="70" align="center" />
           <el-table-column label="操作" width="90" align="center">
             <template #default="{ row }">
               <el-button 
@@ -347,7 +341,55 @@
             </template>
           </el-table-column>
         </el-table>
-        <div style="margin-top: 16px; display: flex; justify-content: flex-end;">
+
+        <!-- AI 资源推荐面板 (插入式) -->
+        <div 
+          v-if="aiRecommendResult || aiRecommendLoading" 
+          class="ai-recommend-section" 
+          v-loading="aiRecommendLoading"
+          element-loading-text="AI 正在分析并推荐资源..."
+        >
+          <el-divider><el-icon color="#d32f2f"><MagicStick /></el-icon> AI 智能推荐资源</el-divider>
+          <div v-if="aiRecommendResult" class="recommend-list">
+            <template v-if="aiRecommendResult.recommendations && aiRecommendResult.recommendations.length > 0">
+              <div v-for="rec in aiRecommendResult.recommendations" :key="rec.resourceId" class="recommend-card">
+                <div class="recommend-info">
+                  <div class="recommend-header">
+                    <span class="rec-title">{{ rec.title }}</span>
+                    <el-tag size="small" type="success" effect="dark">{{ Math.round(rec.matchScore * 100) }}% 匹配</el-tag>
+                  </div>
+                  <div class="rec-reason">{{ rec.reason }}</div>
+                </div>
+                <el-button 
+                  size="small" 
+                  :type="isResourceBound(rec.resourceId) ? 'danger' : 'primary'"
+                  plain
+                  @click="toggleBindResource({id: rec.resourceId} as any)"
+                >
+                  {{ isResourceBound(rec.resourceId) ? '解绑' : '智能绑定' }}
+                </el-button>
+              </div>
+            </template>
+            <el-empty v-else :image-size="40" description="AI 暂未发现更合适的推荐资源" />
+          </div>
+        </div>
+
+        <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <el-button type="primary" :icon="MagicStick" :loading="aiRecommendLoading" @click="fetchAiRecommendations">
+              基于课程信息推荐
+            </el-button>
+            <el-upload
+              :auto-upload="true"
+              :http-request="handleAiRecommendByFile"
+              :show-file-list="false"
+              accept=".pdf,.doc,.docx"
+            >
+              <el-button type="success" :icon="Upload" :loading="aiRecommendLoading">
+                上传大纲深度推荐
+              </el-button>
+            </el-upload>
+          </div>
           <el-pagination
             background
             layout="prev, pager, next, total"
@@ -440,57 +482,134 @@
     </el-dialog>
 
     <!-- 编辑课程基本信息对话框 -->
-    <el-dialog v-model="showEditDialog" title="编辑课程" width="520px" @open="initEditForm">
-      <el-form :model="editForm" label-width="90px" size="large">
-        <el-form-item label="课程名称" required>
-          <el-input v-model="editForm.courseName" placeholder="课程名称" clearable maxlength="50" show-word-limit />
-        </el-form-item>
-        <el-form-item label="课程简介">
-          <el-input v-model="editForm.courseIntro" type="textarea" :rows="3" placeholder="课程简介" />
-        </el-form-item>
-        <el-form-item label="课程封面">
-          <el-upload
-            class="cover-uploader"
-            :show-file-list="false"
-            :http-request="handleUploadCover"
-            accept="image/*"
-            :disabled="coverUploading"
-          >
-            <div v-if="editForm.courseCover" class="cover-preview">
-              <img :src="editForm.courseCover" class="cover-image" />
-              <div class="cover-edit-mask">
-                <el-icon><Edit /></el-icon>
+    <el-dialog v-model="showEditDialog" title="编辑课程" width="900px" @open="initEditForm" class="ai-dialog">
+      <el-row :gutter="30">
+        <!-- 左侧：主要信息表单 (14) -->
+        <el-col :span="14" class="form-section">
+          <el-form :model="editForm" label-width="90px" size="large">
+            <el-form-item label="课程名称" required>
+              <el-input v-model="editForm.courseName" placeholder="课程名称" clearable maxlength="50" show-word-limit />
+            </el-form-item>
+            <el-form-item label="课程简介">
+              <el-input v-model="editForm.courseIntro" type="textarea" :rows="5" placeholder="课程简介" />
+            </el-form-item>
+            <el-form-item label="课程封面">
+              <el-upload
+                class="cover-uploader"
+                :show-file-list="false"
+                :http-request="handleUploadCover"
+                accept="image/*"
+                :disabled="coverUploading"
+              >
+                <div v-if="editForm.courseCover" class="cover-preview">
+                  <img :src="editForm.courseCover" class="cover-image" />
+                  <div class="cover-edit-mask">
+                    <el-icon><Edit /></el-icon>
+                  </div>
+                </div>
+                <div v-else class="cover-placeholder" v-loading="coverUploading">
+                  <el-icon class="cover-uploader-icon"><Plus /></el-icon>
+                </div>
+              </el-upload>
+            </el-form-item>
+            <el-form-item label="学科领域">
+              <el-select v-model="editForm.subjectArea" placeholder="选择学科领域" style="width: 100%" clearable>
+                <el-option v-for="s in subjectAreaOptions" :key="s" :label="s" :value="s" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="加入方式">
+              <el-radio-group v-model="editForm.joinType">
+                <el-radio :value="1">公开加入</el-radio>
+                <el-radio :value="2">审批加入</el-radio>
+              </el-radio-group>
+            </el-form-item>
+            <el-form-item label="开课时间" required>
+              <el-date-picker
+                v-model="editForm.startTime"
+                type="datetime"
+                placeholder="选择开课时间"
+                value-format="YYYY-MM-DD HH:mm:ss"
+                style="width: 100%"
+              />
+            </el-form-item>
+            <el-form-item label="结课时间">
+              <el-date-picker
+                v-model="editForm.endTime"
+                type="datetime"
+                placeholder="选择结课时间 (可选)"
+                value-format="YYYY-MM-DD HH:mm:ss"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-form>
+        </el-col>
+
+        <!-- 右侧：AI 辅助区 (10) -->
+        <el-col :span="10" class="ai-section">
+          <div class="ai-panel">
+            <div class="ai-title">
+              <el-icon color="#d32f2f" style="margin-right:6px"><MagicStick /></el-icon>
+              <span>AI 辅助智能解析</span>
+            </div>
+            <p class="ai-tip">上传您的课程大纲、简介文档（PDF/Word），AI 将自动帮您提取课程信息。</p>
+            
+            <el-upload
+              drag
+              action="#"
+              :auto-upload="true"
+              :http-request="handleAiAnalyze"
+              accept=".pdf,.doc,.docx"
+              :show-file-list="false"
+              class="ai-uploader"
+              :disabled="aiLoading"
+            >
+              <el-icon v-if="!aiLoading" class="el-icon--upload"><UploadFilled /></el-icon>
+              <div v-if="!aiLoading" class="el-upload__text">
+                将文件拖到此处，或<em>点击上传</em>
               </div>
+              <div v-else class="ai-loading-box">
+                <el-icon class="is-loading"><Loading /></el-icon>
+                <p>AI 正在深度解析中...</p>
+              </div>
+            </el-upload>
+
+            <div v-if="aiResult" class="ai-result-preview">
+              <el-divider content-position="left">解析建议结果</el-divider>
+              <div v-if="aiResult.courseName" class="suggest-item">
+                <div class="label">建议名称:</div>
+                <div class="val">{{ aiResult.courseName }}</div>
+              </div>
+              <div v-if="aiResult.subjectArea" class="suggest-item">
+                <div class="label">建议学科:</div>
+                <div class="val"><el-tag size="small" type="success">{{ aiResult.subjectArea }}</el-tag></div>
+              </div>
+              <div class="suggest-item">
+                <div class="label">建议思政标签:</div>
+                <div class="tags">
+                  <el-tag v-for="tag in aiResult.suggestedTags" :key="tag" size="small" effect="plain">{{ tag }}</el-tag>
+                </div>
+              </div>
+              <div v-if="aiResult.suggestedDimensions?.length" class="suggest-item">
+                <div class="label">建议考核维度:</div>
+                <div class="tags">
+                  <el-tag v-for="dimKey in aiResult.suggestedDimensions" :key="dimKey" size="small" type="warning" effect="plain">
+                    {{ dimensionList.find(d => d.key === dimKey)?.name || dimKey }}
+                  </el-tag>
+                </div>
+              </div>
+              <div class="suggest-item">
+                <div class="label">提取关键词:</div>
+                <div class="tags">
+                  <el-tag v-for="k in aiResult.keywords" :key="k" size="small" type="info" effect="plain">{{ k }}</el-tag>
+                </div>
+              </div>
+              <el-button type="success" :icon="Check" size="small" style="width:100%;margin-top:10px" @click="applyAiResult">
+                一键应用至左侧表单
+              </el-button>
             </div>
-            <div v-else class="cover-placeholder" v-loading="coverUploading">
-              <el-icon class="cover-uploader-icon"><Plus /></el-icon>
-            </div>
-          </el-upload>
-        </el-form-item>
-        <el-form-item label="加入方式">
-          <el-radio-group v-model="editForm.joinType">
-            <el-radio :value="1">公开加入</el-radio>
-            <el-radio :value="2">审批加入</el-radio>
-          </el-radio-group>
-        </el-form-item>
-        <el-form-item label="开课时间" required>
-          <el-date-picker
-            v-model="editForm.startTime"
-            type="datetime"
-            placeholder="选择开课时间"
-            value-format="YYYY-MM-DD HH:mm:ss"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="结课时间">
-          <el-date-picker
-            v-model="editForm.endTime"
-            type="datetime"
-            placeholder="选择结课时间 (可选)"
-            value-format="YYYY-MM-DD HH:mm:ss"
-            style="width: 100%"
-          />
-        </el-form-item>
+          </div>
+        </el-col>
+      </el-row>
 
         <!-- 素养评分配置 (简化版) -->
         <el-divider>选择素养考核维度</el-divider>
@@ -505,12 +624,11 @@
         
         <div class="dimension-checkbox-wrap">
           <el-checkbox-group v-model="selectedDimensions" :disabled="isDimensionLocked">
-            <el-checkbox v-for="dim in dimensionList" :key="dim.key" :label="dim.key" border class="dim-checkbox">
+            <el-checkbox v-for="dim in dimensionList" :key="dim.key" :value="dim.key" border class="dim-checkbox">
               {{ dim.name }}
             </el-checkbox>
           </el-checkbox-group>
         </div>
-      </el-form>
       <template #footer>
         <el-button @click="showEditDialog = false">取消</el-button>
         <el-button type="primary" class="red-confirm-btn" :loading="editSubmitting" @click="handleEditCourse">保存设置</el-button>
@@ -614,7 +732,8 @@ import {
   bindChapterResource,
   unbindChapterResource,
   submitCourseForReview,
-  deleteCourseDraft
+  deleteCourseDraft,
+  checkMembership, // Added checkMembership import
 } from '@/api/course'
 import type { PageResponse } from '@/types/api'
 import { getPostList, createPost, type PostItem } from '@/api/community'
@@ -623,9 +742,11 @@ import { useAuthStore } from '@/stores/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Reading, User, UserFilled, Edit, Plus, VideoPlay, Document, Headset, FolderOpened,
-  Download, Delete, Link, Search
+  Download, Delete, Link, Search, MagicStick, UploadFilled, Upload, Loading, Check
 } from '@element-plus/icons-vue'
 import { logBehavior } from '@/api/report'
+import { analyzeCourseFile, getAiResourceRecommendations, getAiResourceRecommendationsByFile, type AiCourseAnalysisResponse, type AiRecommendationResponse } from '@/api/ai'
+import { getAllEnabledSubjects } from '@/api/subject'
 
 const route = useRoute()
 const router = useRouter()
@@ -643,6 +764,72 @@ const showEditDialog = ref(false)
 const isMyTeaching = computed(() =>
   authStore.isTeacher && String(course.value?.teacherId) === String(authStore.userInfo?.userId),
 )
+
+// ───── AI 辅助相关 ─────
+const aiLoading = ref(false)
+const aiResult = ref<AiCourseAnalysisResponse | null>(null)
+const subjectAreaOptions = ref<string[]>([])
+const aiRecommendLoading = ref(false)
+const aiRecommendResult = ref<AiRecommendationResponse | null>(null)
+
+async function fetchSubjects() {
+  try {
+    const res = await getAllEnabledSubjects()
+    subjectAreaOptions.value = (res || []).map(item => item.name)
+  } catch (error: any) {
+    console.error('获取学科分类失败', error)
+  }
+}
+
+async function handleAiAnalyze(options: any) {
+  aiLoading.value = true
+  aiResult.value = null
+  try {
+    const res = await analyzeCourseFile(options.file)
+    aiResult.value = res
+    ElMessage.success('AI 解析完成，您可以查看建议结果并应用')
+  } catch (err: any) {
+    ElMessage.error(err.message || 'AI 解析失败')
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+function applyAiResult() {
+  if (!aiResult.value) return
+  const { courseName, courseIntro, subjectArea, suggestedDimensions } = aiResult.value
+  if (courseName) editForm.courseName = courseName
+  if (courseIntro) editForm.courseIntro = courseIntro
+  if (subjectArea && subjectAreaOptions.value.includes(subjectArea)) {
+    editForm.subjectArea = subjectArea
+  } else if (subjectArea && !subjectAreaOptions.value.includes(subjectArea)) {
+    // 如果 AI 识别到一个新的学科，但当前列表没有，可以选择回填至输入框（如果支持的话）
+    // 这里我们保守一点，只在匹配时回填，或者在没有信息时直接赋初值
+    if (!editForm.subjectArea) editForm.subjectArea = subjectArea
+  }
+  
+  if (suggestedDimensions?.length) {
+    selectedDimensions.value = [...new Set([...selectedDimensions.value, ...suggestedDimensions])]
+  }
+  
+  ElMessage.success('解析建议已应用至表单')
+}
+
+/** 获取 AI 推荐资源 */
+async function fetchAiRecommendations() {
+  aiRecommendLoading.value = true
+  try {
+    const res = await getAiResourceRecommendations(Number(courseId.value))
+    aiRecommendResult.value = res
+    if (res.recommendations.length === 0) {
+      ElMessage.info('AI 暂未发现更合适的推荐资源')
+    }
+  } catch (err: any) {
+    ElMessage.error('推荐失败: ' + (err.message || '服务暂不可用'))
+  } finally {
+    aiRecommendLoading.value = false
+  }
+}
 
 const isCourseFinished = computed(() => {
   if (!course.value) return false
@@ -722,6 +909,12 @@ async function handleQuit() {
 // ───── 课程基本信息编辑 ─────
 const editSubmitting = ref(false)
 const editForm = reactive({
+  id: '',
+  courseName: '',
+  courseIntro: '',
+  courseCover: '',
+  subjectArea: '',
+  joinType: 1,
   startTime: '',
   endTime: '',
 })
@@ -743,11 +936,15 @@ const isDimensionLocked = computed(() => {
 })
 
 function initEditForm() {
+  fetchSubjects() // 确保学科领域列表已加载
   if (course.value) {
+    aiResult.value = null // 重置 AI 状态
     Object.assign(editForm, {
+      id: courseId.value,
       courseName: course.value.courseName || '',
       courseIntro: course.value.courseIntro || course.value.description || '',
       courseCover: course.value.courseCover || course.value.cover || '',
+      subjectArea: course.value.subjectArea || '',
       joinType: course.value.joinType || 1,
       startTime: course.value.startTime || '',
       endTime: course.value.endTime || '',
@@ -799,6 +996,7 @@ async function handleEditCourse() {
       courseName: editForm.courseName,
       courseIntro: editForm.courseIntro, 
       courseCover: editForm.courseCover,
+      subjectArea: editForm.subjectArea,
       joinType: editForm.joinType,
       schoolId: authStore.userInfo?.schoolId ?? undefined,
       startTime: editForm.startTime,
@@ -960,7 +1158,9 @@ async function openBindResourceDialog() {
     } catch {}
   }
   fetchAvailableResources()
+  fetchAiRecommendations()
 }
+
 
 async function fetchAvailableResources() {
   bindResourceLoading.value = true
@@ -1026,6 +1226,22 @@ async function toggleBindResource(res: ResourceItem) {
     }
   } catch (error) {
     ElMessage.error('操作失败')
+  }
+}
+
+async function handleAiRecommendByFile(options: any) {
+  const file = options.file
+  if (!file) return
+  
+  aiRecommendLoading.value = true
+  try {
+    const res = await getAiResourceRecommendationsByFile(file)
+    aiRecommendResult.value = res
+    ElMessage.success('文档分析完成，已为您推荐相关资源')
+  } catch (err: any) {
+    ElMessage.error(err.message || '分析文档推荐失败')
+  } finally {
+    aiRecommendLoading.value = false
   }
 }
 
@@ -1702,4 +1918,39 @@ onMounted(async () => {
   color: #fff; opacity: 0; font-size: 24px; transition: opacity 0.2s;
 }
 .cover-preview:hover .cover-edit-mask { opacity: 1; }
+</style>
+
+<style scoped>
+/* AI 辅助弹窗样式 */
+.ai-dialog :deep(.el-dialog__body) { padding: 20px 30px; }
+.form-section { border-right: 1px solid #efefef; }
+.ai-panel { background: #fcfcfc; border-radius: 12px; padding: 20px; border: 1px dashed #d32f2f44; }
+.ai-title { font-size: 16px; font-weight: 700; color: #d32f2f; margin-bottom: 12px; display: flex; align-items: center; }
+.ai-tip { font-size: 13px; color: #78909c; margin-bottom: 20px; line-height: 1.6; }
+.ai-uploader :deep(.el-upload-dragger) { border-width: 2px; }
+.ai-loading-box { padding: 20px 0; color: #d32f2f; text-align: center; }
+.ai-loading-box p { margin-top: 10px; font-size: 13px; }
+.ai-result-preview { margin-top: 20px; animation: fadeInUp 0.5s; }
+.suggest-item { margin-bottom: 12px; }
+.suggest-item .label { font-size: 12px; color: #546e7a; margin-bottom: 6px; font-weight: 600; }
+.suggest-item .tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.suggest-item .val { font-size: 13px; color: #263238; }
+
+/* 资源推荐样式 */
+.ai-recommend-section { margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px; }
+.recommend-list { max-height: 240px; overflow-y: auto; padding: 10px 0; }
+.recommend-card { 
+  display: flex; align-items: center; justify-content: space-between; 
+  padding: 12px; background: #f9f9f9; border-radius: 8px; margin-bottom: 10px;
+  border-left: 4px solid #d32f2f;
+}
+.recommend-info { flex: 1; margin-right: 16px; }
+.recommend-header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.rec-title { font-weight: 600; font-size: 14px; color: #263238; }
+.rec-reason { font-size: 12px; color: #78909c; }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 </style>

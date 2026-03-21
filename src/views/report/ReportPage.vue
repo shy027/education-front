@@ -43,7 +43,7 @@
           <div class="section-row">
             <div class="section-card radar-card">
               <div class="card-header">
-                <h3>六维素养雷达图</h3>
+                <h3>五维素养雷达图</h3>
               </div>
               <div ref="radarChartRef" class="radar-chart" />
             </div>

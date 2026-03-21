@@ -921,12 +921,11 @@ const editForm = reactive({
 
 // ───── 素养评分配置 ─────
 const dimensionList = [
-  { key: 'dimension1', name: '专业理论' },
-  { key: 'dimension2', name: '技术技能' },
-  { key: 'dimension3', name: '职业认同' },
-  { key: 'dimension4', name: '工艺创新' },
-  { key: 'dimension5', name: '社会责任' },
-  { key: 'dimension6', name: '持续发展' },
+  { key: 'dimension1', name: '知识技能素养' },
+  { key: 'dimension2', name: '职业品格素养' },
+  { key: 'dimension3', name: '创新实践素养' },
+  { key: 'dimension4', name: '社会责任素养' },
+  { key: 'dimension5', name: '发展适应素养' },
 ]
 
 const selectedDimensions = ref<string[]>([])

@@ -44,7 +44,6 @@ export interface TrackPoint {
   dimension3Score: number
   dimension4Score: number
   dimension5Score: number
-  dimension6Score: number
 }
 
 export interface GrowthTrackResponse {

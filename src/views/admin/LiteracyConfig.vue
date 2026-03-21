@@ -4,7 +4,7 @@
     <div class="page-header">
       <div>
         <h2 class="page-title">素养算法配置</h2>
-        <p class="page-desc">调整 6 维度素养计算权重、阈值及资源评分规则</p>
+        <p class="page-desc">调整 5 维度素养计算权重、阈值及资源评分规则</p>
       </div>
       <div class="header-actions">
         <el-button 
@@ -67,7 +67,7 @@
               </el-tag>
             </div>
           </template>
-          <div class="weight-item" v-for="i in 6" :key="i">
+          <div class="weight-item" v-for="i in 5" :key="i">
             <span class="label">维度 {{ i }} ({{ dimensionNames['dimension' + i] || '未命名' }})</span>
             <el-input-number 
               v-model="weights['dimension' + i]" 
@@ -163,18 +163,16 @@
                 <el-input-number v-model="row.max_score" :min="0" :max="100" controls-position="right" size="small" style="width: 80px" />
               </template>
             </el-table-column>
-            <el-table-column v-for="i in 6" :key="i" :label="dimensionNames['dimension' + i] || ('D'+i)" min-width="120" align="center">
+            <el-table-column v-for="i in 5" :key="i" :label="dimensionNames['dimension' + i] || ('D'+i)" min-width="140" align="center">
               <template #default="{ row }">
-                <el-input-number 
+                <el-rate 
                   v-model="row.weights['dimension' + i]" 
-                  :precision="2" 
-                  :step="0.1" 
-                  :min="0" 
-                  :max="1" 
-                  controls-position="right"
-                  size="small"
-                  class="weight-input"
+                  :max="5"
+                  allow-half
+                  clearable
+                  class="star-rate"
                 />
+                <div class="star-value">权重: {{ row.weights['dimension' + i] ? (row.weights['dimension' + i] * 0.2).toFixed(2) : '0.00' }}</div>
               </template>
             </el-table-column>
           </el-table>
@@ -204,12 +202,11 @@ const saveLoading = ref(false)
 const refreshLoading = ref(false)
 const calcLoading = ref(false)
 const dimensionNames = ref<Record<string, string>>({
-  dimension1: '专业理论',
-  dimension2: '技术技能',
-  dimension3: '职业认同',
-  dimension4: '工艺创新',
-  dimension5: '社会责任',
-  dimension6: '持续发展'
+  dimension1: '知识技能素养',
+  dimension2: '职业品格素养',
+  dimension3: '创新实践素养',
+  dimension4: '社会责任素养',
+  dimension5: '发展适应素养'
 })
 
 // 各模块数据
@@ -224,7 +221,7 @@ const tagList = ref<any[]>([])
 // 计算权重总和 (处理浮点数精度)
 const weightSum = computed(() => {
   let sum = 0
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 5; i++) {
     sum += Number(weights.value['dimension' + i] || 0)
   }
   return Math.round(sum * 100) / 100
@@ -242,7 +239,7 @@ const configErrors = computed(() => {
     errors.push(`标签映射: 有 ${incompleteTags.length} 个标签缺失“上限分”配置`)
   }
   
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 5; i++) {
     if (weights.value['dimension' + i] == null) {
         errors.push(`维度权重: 维度 ${i} 权重缺失 (NULL)`)
     }
@@ -264,7 +261,7 @@ async function fetchData() {
     
     // 1. 标准化维度权重 (用户要求：读取什么就是什么，不强制设 0)
     const normalizedWeights: Record<string, any> = {}
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 5; i++) {
         normalizedWeights['dimension' + i] = w['dimension' + i] ?? w['dimension_' + i] ?? null
     }
     weights.value = normalizedWeights
@@ -299,8 +296,10 @@ async function fetchData() {
     tagList.value = allTagNames.map(name => {
       const config = backendTags[name] || {}
       const tagWeights: Record<string, any> = {}
-      for (let i = 1; i <= 6; i++) {
-          tagWeights['dimension' + i] = config.weights?.['dimension' + i] ?? config.weights?.['dimension_' + i] ?? null
+      for (let i = 1; i <= 5; i++) {
+          const val = config.weights?.['dimension' + i] ?? config.weights?.['dimension_' + i] ?? 0
+          // 始终将后端的小数权重 (0-1) 转换为前端显示的星级 (0-5)
+          tagWeights['dimension' + i] = Number(val) * 5
       }
       return {
         tagName: name,
@@ -345,8 +344,8 @@ async function handleRecalculateAll() {
     )
     
     calcLoading.value = true
-    await recalculateAllProfiles(0) // 0 代表全校
-    ElMessage.success('重算指令已下发，系统正在后台校正所有画像数据')
+      await recalculateAllProfiles(0) // 0 代表全校
+      ElMessage.success('重算指令已下推，请等待 1-2 分钟后刷新页面查看')
   } catch (err) {
     if (err !== 'cancel') {
       console.error('Recalculate error:', err)
@@ -371,9 +370,15 @@ async function handleSaveAll() {
   try {
     // 转换标签列表回 Map
     const tagWeightsData = tagList.value.reduce((acc, item) => {
+      const convertedWeights: Record<string, number> = {}
+      for (let i = 1; i <= 5; i++) {
+        const starVal = item.weights['dimension' + i] || 0
+        // 将星级 (0-5) 转换为后端逻辑所需的权重 (0-1)
+        convertedWeights['dimension' + i] = Math.round((starVal * 0.2) * 100) / 100
+      }
       acc[item.tagName] = {
         max_score: item.max_score,
-        weights: item.weights
+        weights: convertedWeights
       }
       return acc
     }, {} as Record<string, any>)
@@ -452,7 +457,13 @@ onMounted(fetchData)
   font-size: 13px;
 }
 
-.weight-input {
-  width: 90px;
+.star-rate {
+  display: inline-flex;
+  vertical-align: middle;
+}
+.star-value {
+  font-size: 11px;
+  color: #90a4ae;
+  margin-top: -4px;
 }
 </style>

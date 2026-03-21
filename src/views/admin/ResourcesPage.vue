@@ -15,8 +15,8 @@
           <el-option label="全部" :value="undefined" />
           <el-option label="待审核" :value="1" />
           <el-option label="已发布" :value="2" />
-          <el-option label="已下架" :value="3" />
-          <el-option label="审核拒绝" :value="4" />
+          <el-option label="审核拒绝" :value="3" />
+          <el-option label="已下架" :value="4" />
         </el-select>
         <el-button type="primary" class="red-btn" @click="handleSearch">搜索</el-button>
       </div>
@@ -37,9 +37,9 @@
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag
-              :type="(['info','warning','success','info','danger'] as const)[row.status] ?? 'info'"
+              :type="(['info','warning','success','danger','info'] as const)[row.status] ?? 'info'"
               size="small"
-            >{{ ['草稿','待审核','已发布','已下架','审核拒绝'][row.status] || '—' }}</el-tag>
+            >{{ ['草稿','待审核','已发布','审核拒绝','已下架'][row.status] || '—' }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="创建时间" prop="createdTime" width="120">

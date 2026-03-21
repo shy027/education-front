@@ -52,8 +52,8 @@
           />
         </el-form-item>
 
-        <el-form-item label="标签">
-          <el-select v-model="form.tagIds" multiple placeholder="选择标签（选填，最多 5 个）" filterable collapse-tags style="width:100%">
+        <el-form-item label="标签" prop="tagIds">
+          <el-select v-model="form.tagIds" multiple placeholder="选择标签（必填，最多 5 个）" filterable collapse-tags style="width:100%">
             <el-option v-for="t in enabledTags" :key="t.id" :label="t.tagName" :value="t.id" />
           </el-select>
         </el-form-item>
@@ -116,7 +116,7 @@
             class="submit-btn publish-btn"
             :loading="submitting"
             @click="handleSubmit('publish')"
-          >发布并提交审核</el-button>
+          >{{ authStore.isAdmin ? '发布资源' : '发布并提交审核' }}</el-button>
         </el-form-item>
       </el-form>
 
@@ -149,7 +149,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, markRaw, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules, UploadRawFile } from 'element-plus'
 import {
@@ -157,13 +157,18 @@ import {
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import {
-  createResource, submitResourceForAudit, getCategoryTree, getEnabledTags,
+  createResource, updateResource, getResourceDetail,
+  submitResourceForAudit, getCategoryTree, getEnabledTags,
   uploadResourceImage, uploadResourceVideo, uploadResourcePdf,
 } from '@/api/resource'
 import type { CategoryNode, TagItem, ResourceCreateReq } from '@/api/resource'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
+
+const resourceId = computed(() => route.params.id as string)
+const isEdit = computed(() => !!resourceId.value)
 
 // ─── 资源类型 ───
 const RESOURCE_TYPES = [
@@ -210,6 +215,9 @@ const rules: FormRules = {
   title: [
     { required: true, message: '请输入资源标题', trigger: 'blur' },
     { max: 100, message: '标题不超过 100 字', trigger: 'blur' },
+  ],
+  tagIds: [
+    { type: 'array', required: true, message: '请至少选择一个标签', trigger: 'change' },
   ],
   fileUrl: [
     {
@@ -259,13 +267,36 @@ async function handleFileUpload(file: UploadRawFile) {
   return false
 }
 
+async function fetchResourceDetail() {
+  if (!isEdit.value) return
+  submitting.value = true
+  try {
+    const data = await getResourceDetail(resourceId.value as any)
+    // 后端返回的是 ResourceDetailResponse，需要映射到 ResourceCreateReq
+    form.title = data.title
+    form.summary = data.summary || ''
+    form.content = data.content || ''
+    form.coverUrl = data.coverUrl || ''
+    form.categoryId = data.categoryId
+    form.resourceType = data.resourceType
+    form.fileUrl = data.attachments?.[0]?.fileUrl || ''
+    form.tagIds = data.tags?.map(t => t.id) || []
+    selectedCategory.value = data.categoryId
+  } catch (err) {
+    ElMessage.error('获取资源详情失败')
+    router.push('/resource')
+  } finally {
+    submitting.value = false
+  }
+}
+
 // ─── 提交 ───
 async function handleSubmit(mode: 'draft' | 'publish') {
   const ok = await formRef.value?.validate().catch(() => false)
   if (!ok) return
   submitting.value = true
   try {
-    const payload: ResourceCreateReq = {
+    const payload: any = {
       title: form.title,
       summary: form.summary || undefined,
       content: form.content || undefined,
@@ -275,11 +306,23 @@ async function handleSubmit(mode: 'draft' | 'publish') {
       resourceType: form.resourceType,
       fileUrl: form.fileUrl || undefined,
     }
-    const id = await createResource(payload)
+    
+    let id: any = resourceId.value
+    if (isEdit.value) {
+      await updateResource(id as any, payload)
+      ElMessage.success('更新成功')
+    } else {
+      id = await createResource(payload)
+    }
+
     if (mode === 'publish') {
       await submitResourceForAudit(id)
-      ElMessage.success('资源已发布并提交审核，请等待审核结果')
-    } else {
+      if (authStore.isAdmin) {
+        ElMessage.success('资源已成功发布')
+      } else {
+        ElMessage.success('资源已发布并提交审核，请等待审核结果')
+      }
+    } else if (!isEdit.value) {
       ElMessage.success('草稿已保存')
     }
     router.push(`/resource/${id}`)
@@ -290,6 +333,10 @@ onMounted(async () => {
   const [tree, tags] = await Promise.all([getCategoryTree(), getEnabledTags()])
   categoryOptions.value = tree
   enabledTags.value = tags
+  
+  if (isEdit.value) {
+    await fetchResourceDetail()
+  }
 })
 </script>
 

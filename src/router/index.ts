@@ -108,6 +108,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '发布资源', hideInMenu: true },
       },
       {
+        path: 'resource/edit/:id',
+        name: 'ResourceEdit',
+        component: () => import('@/views/resource/ResourceCreatePage.vue'),
+        meta: { title: '编辑资源', hideInMenu: true },
+      },
+      {
         path: 'resource/:id',
         name: 'ResourceDetail',
         component: () => import('@/views/resource/ResourceDetailPage.vue'),

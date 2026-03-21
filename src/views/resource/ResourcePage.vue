@@ -84,6 +84,15 @@
           </el-select>
           <el-button
             v-if="authStore.isTeacher || authStore.isAdmin"
+            link
+            type="primary"
+            style="margin-right: 8px"
+            @click="toggleDraftMode"
+          >
+            {{ query.status === 0 ? '返回列表' : '我的草稿' }}
+          </el-button>
+          <el-button
+            v-if="authStore.isTeacher || authStore.isAdmin"
             type="primary"
             :icon="Plus"
             size="small"
@@ -118,6 +127,10 @@
                 <el-icon :size="32" color="#fff"><View /></el-icon>
               </div>
             </div>
+            <!-- 状态角标 (仅非发布状态显示) -->
+            <div v-if="r.status !== 2" class="status-badge" :class="`status-${r.status}`">
+              {{ ['草稿', '待审核', '已发布', '已拒绝', '已下架'][r.status] }}
+            </div>
           </div>
 
           <!-- 信息区 -->
@@ -145,7 +158,7 @@
       <!-- 空状态 -->
       <el-empty
         v-if="!loading && !resources.length"
-        description="暂无相关资源"
+        :description="query.status === 0 ? '暂无草稿资源' : '暂无相关资源'"
         :image-size="120"
       >
         <el-button class="publish-btn" v-if="authStore.isTeacher || authStore.isAdmin" @click="$router.push('/resource/create')">
@@ -231,6 +244,17 @@ function selectCategory(id: string | undefined) { query.categoryId = id; query.p
 // ─── 标签 ───
 const enabledTags = ref<TagItem[]>([])
 function selectTag(id: string | undefined) { query.tagId = id; query.pageNum = 1; fetchResources() }
+
+function toggleDraftMode() {
+  if (query.status === 0) {
+    query.status = 2
+    query.creatorId = undefined
+  } else {
+    query.status = 0
+    query.creatorId = authStore.userInfo?.userId
+  }
+  handleSearch()
+}
 
 onMounted(async () => {
   await Promise.all([
@@ -416,6 +440,18 @@ onMounted(async () => {
   display: flex; align-items: center; justify-content: center;
   backdrop-filter: blur(4px);
 }
+
+.status-badge {
+  position: absolute; top: 12px; right: 12px;
+  padding: 4px 10px; border-radius: 8px;
+  font-size: 11px; font-weight: 700; color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  z-index: 2;
+}
+.status-0 { background: rgba(120, 144, 156, 0.9); } /* 草稿 */
+.status-1 { background: rgba(25, 118, 210, 0.9); }  /* 待审核 */
+.status-3 { background: rgba(211, 47, 47, 0.9); }   /* 已拒绝 */
+.status-4 { background: rgba(69, 90, 100, 0.9); }    /* 已下架 */
 
 /* 信息区 */
 .card-info { padding: 14px; flex: 1; display: flex; flex-direction: column; }

@@ -98,9 +98,9 @@
 
               <!-- 教师/管理员：编辑/审核 -->
               <template v-if="canEdit">
-                <el-button :icon="Edit" @click="showEditDialog = true">编辑</el-button>
+                <el-button :icon="Edit" @click="router.push({ name: 'ResourceEdit', params: { id: resourceId } })">编辑</el-button>
                 <el-button
-                  v-if="resource.status === 0"
+                  v-if="resource.status === 0 || resource.status === 3"
                   type="warning"
                   @click="handleSubmitAudit"
                 >提交审核</el-button>
@@ -116,19 +116,19 @@
               <el-button
                 v-if="authStore.isAdmin && resource.status === 1"
                 type="success"
-                @click="handleAdminAudit(2)"
+                @click="handleAdminAudit(1)"
               >审核通过</el-button>
               <el-button
                 v-if="authStore.isAdmin && resource.status === 1"
                 type="danger"
                 plain
-                @click="handleAdminAudit(4)"
+                @click="handleAdminAudit(2)"
               >审核拒绝</el-button>
             </div>
 
             <!-- 管理员：审核拒绝原因 -->
             <el-alert
-              v-if="resource.status === 4"
+              v-if="resource.status === 3"
               type="error"
               show-icon
               :closable="false"
@@ -213,50 +213,9 @@
         </el-card>
       </div>
 
-      <!-- ===== 右侧推荐 ===== -->
-      <aside class="resource-sidebar">
-        <div class="sidebar-title">相关资源</div>
-        <div v-loading="relatedLoading" class="related-list">
-          <div
-            v-for="r in relatedResources"
-            :key="r.id"
-            class="related-item"
-            @click="$router.push(`/resource/${r.id}`)"
-          >
-            <div class="related-cover" :class="`bg-type-${r.resourceType}`">
-              <img v-if="r.coverUrl" :src="r.coverUrl" :alt="r.title" />
-              <el-icon v-else :size="20" color="rgba(255,255,255,0.8)"><component :is="typeIcon(r.resourceType)" /></el-icon>
-            </div>
-            <div class="related-info">
-              <div class="related-title">{{ r.title }}</div>
-              <div class="related-meta">
-                {{ typeLabel(r.resourceType) }} · {{ r.viewCount }} 次浏览
-              </div>
-            </div>
-          </div>
-          <el-empty v-if="!relatedLoading && !relatedResources.length" description="暂无相关资源" :image-size="60" />
-        </div>
-      </aside>
     </div>
 
-    <!-- 编辑对话框 -->
-    <el-dialog v-model="showEditDialog" title="编辑资源" width="560px" :close-on-click-modal="false">
-      <el-form :model="editForm" label-width="90px" size="large">
-        <el-form-item label="资源标题">
-          <el-input v-model="editForm.title" clearable />
-        </el-form-item>
-        <el-form-item label="简介">
-          <el-input v-model="editForm.summary" type="textarea" :rows="2" />
-        </el-form-item>
-        <el-form-item label="正文内容">
-          <el-input v-model="editForm.content" type="textarea" :rows="6" placeholder="支持换行，保存后可查看" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showEditDialog = false">取消</el-button>
-        <el-button type="primary" class="red-confirm-btn" :loading="editLoading" @click="handleSaveEdit">保存</el-button>
-      </template>
-    </el-dialog>
+    <!-- 编辑对话框已移除，跳转至独立编辑页 -->
   </div>
 </template>
 
@@ -286,9 +245,14 @@ const loading = ref(false)
 const resource = ref<ResourceItem | null>(null)
 const auditLogs = ref<AuditLog[]>([])
 
-const canEdit = computed(() =>
-  authStore.isAdmin || resource.value?.creatorId === authStore.userInfo?.userId,
-)
+const canEdit = computed(() => {
+  if (!resource.value) return false
+  const isAdmin = authStore.isAdmin
+  const isCreator = resource.value.creatorId == authStore.userInfo?.userId
+  // 已经发布审核成功的内容不可再编辑（管理员除外）
+  if (resource.value.status === 2) return isAdmin
+  return isAdmin || isCreator
+})
 
 function typeIcon(t: number) { return { 1: markRaw(Document), 2: markRaw(VideoPlay), 3: markRaw(Document), 4: markRaw(Headset) }[t] ?? markRaw(Document) }
 function typeLabel(t: number): string { return { 1: '文章', 2: '视频', 3: '文档', 4: '音频' }[t] ?? '资源' }
@@ -424,62 +388,14 @@ async function handleAdminAudit(status: number) {
   }
   await auditResource(resourceId.value, { auditResult: status, auditRemark: remark })
   ElMessage.success(approved ? '已通过审核' : '已拒绝')
-  resource.value!.status = approved ? 2 : 4  // 2=已发布 4=审核拒绝
+  // 刷新详情
+  fetchDetail()
 }
 
-// ─── 编辑 ───
-const showEditDialog = ref(false)
-const editLoading = ref(false)
-const editForm = reactive({ title: '', summary: '', content: '' })
-
-function openEdit() {
-  editForm.title = resource.value?.title ?? ''
-  editForm.summary = resource.value?.summary ?? ''
-  editForm.content = resource.value?.content ?? ''
-  showEditDialog.value = true
-}
-
-async function handleSaveEdit() {
-  editLoading.value = true
-  try {
-    await updateResource(resourceId.value, {
-      title: editForm.title,
-      summary: editForm.summary,
-      content: editForm.content,
-    })
-    ElMessage.success('保存成功')
-    showEditDialog.value = false
-    await fetchDetail()
-  } finally { editLoading.value = false }
-}
-
-// ─── 相关资源（同类型/分类） ───
-const relatedLoading = ref(false)
-const relatedResources = ref<ResourceItem[]>([])
-
-async function fetchRelated() {
-  if (!resource.value) return
-  relatedLoading.value = true
-  try {
-    const res = await getResourceList({
-      resourceType: resource.value.resourceType,
-      categoryId: resource.value.categoryId,
-      status: 2,
-      pageSize: 6,
-    } as ReturnType<typeof Object.assign>)
-    relatedResources.value = (res?.records || []).filter((r) => r.id !== resourceId.value)
-  } catch { /* 静默 */ }
-  finally { relatedLoading.value = false }
-}
-
-// ─── 音频状态 ───
-const audioPlaying = ref(false)
+// ─── 编辑功能已迁移至 ResourceCreatePage (编辑模式) ───
 
 onMounted(async () => {
   await fetchDetail()
-  // 保持 selectedAttachIdx = -1，所有附件均等待用户手动点击「在线预览」后激活
-  // 避免对带 Content-Disposition: attachment 的 OSS 附件自动触发浏览器下载
-  fetchRelated()
   trackView()
 })
 </script>
@@ -490,7 +406,7 @@ onMounted(async () => {
 .back-btn { margin-bottom: 4px; color: #78909c; }
 
 /* ===== 详情布局 ===== */
-.detail-layout { display: grid; grid-template-columns: 1fr 280px; gap: 20px; align-items: start; }
+.detail-layout { display: flex; flex-direction: column; gap: 20px; }
 
 /* ===== 主内容 ===== */
 .main-content { display: flex; flex-direction: column; gap: 16px; }
@@ -641,48 +557,7 @@ onMounted(async () => {
 .log-auditor { font-weight: 600; color: #455a64; }
 .log-comment { color: #78909c; margin-left: 6px; }
 
-/* ===== 右侧推荐 ===== */
-.resource-sidebar {
-  background: #fff;
-  border-radius: 16px;
-  padding: 16px;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-  position: sticky; top: 72px;
-}
-
-.sidebar-title {
-  font-size: 14px; font-weight: 700; color: #263238;
-  margin-bottom: 14px; padding-bottom: 10px;
-  border-bottom: 2px solid #ffebee;
-  color: #d32f2f;
-}
-
-.related-list { display: flex; flex-direction: column; gap: 10px; }
-
-.related-item {
-  display: flex; gap: 10px; align-items: center;
-  cursor: pointer; padding: 6px; border-radius: 10px; transition: all 0.2s;
-}
-.related-item:hover { background: #fff8f8; }
-
-.related-cover {
-  width: 72px; height: 48px; flex-shrink: 0; border-radius: 8px;
-  display: flex; align-items: center; justify-content: center; overflow: hidden;
-}
-.related-cover img { width: 100%; height: 100%; object-fit: cover; }
-
-.related-title { font-size: 13px; font-weight: 600; color: #263238; line-height: 1.4; margin-bottom: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.related-meta  { font-size: 11px; color: #90a4ae; }
-
-/* ===== 确认按钮 ===== */
-:deep(.red-confirm-btn) {
-  background: linear-gradient(135deg, #ff5252, #d32f2f) !important;
-  border: none !important;
-}
-
 @media (max-width: 1000px) {
-  .detail-layout { grid-template-columns: 1fr; }
-  .resource-sidebar { position: relative; top: 0; }
   .resource-hero { flex-direction: column; }
   .hero-left { width: 100% !important; }
   .media-box { width: 100% !important; }

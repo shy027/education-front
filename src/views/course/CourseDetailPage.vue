@@ -1157,7 +1157,6 @@ async function openBindResourceDialog() {
     } catch {}
   }
   fetchAvailableResources()
-  fetchAiRecommendations()
 }
 
 

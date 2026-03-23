@@ -31,11 +31,15 @@
               ></iframe>
               <!-- 图片封面 (文章或无预览文件时) -->
               <img
-                v-else-if="resource.coverUrl"
+                v-else-if="resource.coverUrl && previewType === 'none'"
                 :src="resource.coverUrl"
                 :alt="resource.title"
                 class="cover-img"
               />
+              <!-- 音频播放器 (在 Hero 预览区显示) -->
+              <div v-else-if="previewType === 'audio' && previewUrl" class="audio-hero-wrap">
+                <audio ref="audioRef" :key="previewUrl" :src="previewUrl" controls class="audio-player-hero" @play="trackView" />
+              </div>
               <!-- 默认图标 -->
               <div v-else class="media-fallback">
                 <el-icon :size="64" color="rgba(255,255,255,0.8)"><component :is="typeIcon(resource.resourceType)" /></el-icon>
@@ -139,55 +143,44 @@
           </div>
         </div>
 
-        <!-- 正文/内容 -->
-        <el-card class="content-card" shadow="never">
+        <!-- 精简后的资源详情 (仅文章显示且有内容) -->
+        <el-card v-if="resource.resourceType === 1" class="content-card" shadow="never">
           <template #header>
             <div class="card-header">
               <h3>资源详情</h3>
-              <el-button
-                v-if="previewType === 'audio' && previewUrl"
-                type="primary" plain size="small" :icon="Headset"
-                @click="audioPlaying = !audioPlaying"
-              >
-                {{ audioPlaying ? '暂停' : '播放' }}音频
-              </el-button>
             </div>
           </template>
-
-          <!-- 音频播放器 -->
-          <div v-if="previewType === 'audio' && previewUrl" class="audio-wrap">
-            <audio ref="audioRef" :key="previewUrl" :src="previewUrl" controls class="audio-player" @play="trackView" />
-          </div>
-
           <!-- 富文本内容 -->
           <div
             v-if="resource.content"
             class="resource-content"
             v-html="formattedContent"
           />
+          <el-empty v-else description="该资源暂无正文内容" :image-size="80" />
+        </el-card>
 
-          <!-- 附件列表 -->
-          <div v-if="resource.attachments?.length" class="attachments-section">
-            <div class="section-title">资源附件 ({{ resource.attachments.length }})</div>
-            <div class="attachment-list">
-              <div
-                v-for="(file, index) in resource.attachments"
-                :key="file.id"
-                class="attachment-item"
-                :class="{ active: selectedAttachIdx === index }"
-              >
-                <el-icon><Document /></el-icon>
-                <span class="file-name" :title="file.fileName">{{ file.fileName }}</span>
-                <div class="attach-actions">
-                  <el-button type="primary" link @click="selectedAttachIdx = index">在线预览</el-button>
-                  <el-button type="info" link @click="handleFileDownload(file.fileUrl, file.fileName)">下载</el-button>
-                </div>
+        <!-- 资源附件列表 (如果是文件类或有附件则显示) -->
+        <el-card v-if="resource.attachments?.length" class="attachments-card" shadow="never">
+          <template #header>
+            <div class="card-header">
+              <h3>{{ resource.resourceType === 1 ? '相关附件' : '资源附件' }} ({{ resource.attachments.length }})</h3>
+            </div>
+          </template>
+          <div class="attachment-list">
+            <div
+              v-for="(file, index) in resource.attachments"
+              :key="file.id"
+              class="attachment-item"
+              :class="{ active: selectedAttachIdx === index }"
+            >
+              <el-icon><Document /></el-icon>
+              <span class="file-name" :title="file.fileName">{{ file.fileName }}</span>
+              <div class="attach-actions">
+                <el-button type="primary" link @click="selectedAttachIdx = index">在线预览</el-button>
+                <el-button type="info" link @click="handleFileDownload(file.fileUrl, file.fileName)">下载</el-button>
               </div>
             </div>
           </div>
-
-          <!-- 无内容 -->
-          <el-empty v-if="!resource.content && resource.resourceType === 1" description="该资源暂无正文内容" :image-size="80" />
         </el-card>
 
         <!-- 审核记录（教师/管理员可见） -->
@@ -479,16 +472,13 @@ onMounted(async () => {
   border: none !important; border-radius: 8px !important;
 }
 
-/* ===== 内容卡片 ===== */
-.content-card { border-radius: 14px !important; }
+.audio-hero-wrap { width: 100%; padding: 20px; }
+.audio-player-hero { width: 100%; }
 
-:deep(.content-card .el-card__header) { padding: 14px 20px; }
-
-.card-header { display: flex; align-items: center; justify-content: space-between; }
-.card-header h3 { margin: 0; font-size: 16px; font-weight: 700; color: #263238; }
-
-.audio-wrap { margin-bottom: 24px; }
-.audio-player { width: 100%; border-radius: 8px; background: #f5f5f5; }
+/* 附件卡片 */
+.attachments-card { border-radius: 14px !important; margin-top: 4px; }
+:deep(.attachments-card .el-card__header) { padding: 14px 20px; }
+:deep(.attachments-card .el-card__body) { padding: 20px; }
 
 /* 附件区域 */
 .attachments-section {

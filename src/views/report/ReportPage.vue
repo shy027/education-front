@@ -19,15 +19,15 @@
           <div class="stat-cards">
             <div class="stat-card">
               <div class="stat-icon red"><el-icon :size="22"><DataAnalysis /></el-icon></div>
-              <div><div class="stat-num">{{ stats?.totalWatchDuration ? Math.floor(stats.totalWatchDuration / 60) + ' min' : '—' }}</div><div class="stat-label">学习时长</div></div>
+              <div><div class="stat-num">{{ myCourseOptions.length }}</div><div class="stat-label">参与课程</div></div>
             </div>
             <div class="stat-card">
               <div class="stat-icon blue"><el-icon :size="22"><Comment /></el-icon></div>
-              <div><div class="stat-num">{{ stats?.totalPosts ?? '—' }}</div><div class="stat-label">参与讨论</div></div>
+              <div><div class="stat-num">{{ (stats?.behaviorStats?.['POST_COMMENT']?.uniqueCount ?? 0) + (stats?.behaviorStats?.['GROUP_DISCUSS']?.uniqueCount ?? 0) }}</div><div class="stat-label">参与讨论</div></div>
             </div>
             <div class="stat-card">
               <div class="stat-icon green"><el-icon :size="22"><Finished /></el-icon></div>
-              <div><div class="stat-num">{{ stats?.totalAnswers ?? '—' }}</div><div class="stat-label">完成作业</div></div>
+              <div><div class="stat-num">{{ stats?.behaviorStats?.['SUBMIT_TASK']?.uniqueCount ?? stats?.behaviorStats?.['SUBMIT_ANSWER']?.uniqueCount ?? 0 }}</div><div class="stat-label">完成作业</div></div>
             </div>
             <div class="stat-card">
               <div class="stat-icon yellow"><el-icon :size="22"><Trophy /></el-icon></div>
@@ -35,7 +35,7 @@
             </div>
             <div class="stat-card">
               <div class="stat-icon purple"><el-icon :size="22"><Medal /></el-icon></div>
-              <div><div class="stat-num">{{ profile?.level ?? '—' }}</div><div class="stat-label">综合等级</div></div>
+              <div><div class="stat-num">{{ profile?.level || (profile as any)?.profileLevel || '—' }}</div><div class="stat-label">综合等级</div></div>
             </div>
           </div>
 
@@ -54,7 +54,7 @@
                   <div class="dimension-header">
                     <span class="dimension-dot" :style="{ background: RADAR_COLORS[idx] }" />
                     <span class="dimension-name">{{ d.name }}</span>
-                    <span class="dimension-score">{{ d.score.toFixed(1) }}</span>
+                    <span class="dimension-score">{{ d.score.toFixed(1) }} / 100</span>
                   </div>
                   <el-progress :percentage="d.score" :stroke-width="6" :show-text="false" :color="RADAR_COLORS[idx]" />
                   <div class="dimension-desc">{{ d.desc }}</div>
@@ -171,7 +171,7 @@
                   <!-- 学生：素养等级 -->
                   <div v-else class="crc-status">
                     <template v-if="profileMap[c.courseId]">
-                      <el-tag type="danger" size="small">{{ profileMap[c.courseId]!.level }}</el-tag>
+                      <el-tag type="danger" size="small">{{ profileMap[c.courseId]!.level || (profileMap[c.courseId] as any)!.profileLevel }}</el-tag>
                       <span class="crc-score">{{ profileMap[c.courseId]!.totalScore?.toFixed(1) }} 分</span>
                     </template>
                     <span v-else class="crc-no-report">暂无评估</span>
@@ -247,13 +247,15 @@ const schoolReports = ref<ReportDTO[]>([])
 async function fetchListData() {
   listLoading.value = true
   try {
+    
+    // 加载课程列表
+    const res = await getMyCourses()
+    myCourseOptions.value = authStore.isStudent ? (res.learning ?? []) : (res.teaching ?? [])
+
     if (authStore.isStudent) {
       await openDetailForStudent()
       return
     }
-
-    const res = await getMyCourses()
-    myCourseOptions.value = res.teaching ?? []
 
     // 并行加载每课摘要
     await Promise.all(myCourseOptions.value.map(c => loadCourseSummary(c)))
@@ -317,12 +319,22 @@ async function openDetailForStudent() {
   detailLoading.value = true
   try {
     const cid = '0'
-    await Promise.all([
-      getMyProfile(cid).then(r => { profile.value = r }).catch(() => { profile.value = null }),
-      getRadarData(cid).then(r => { radarData.value = r }).catch(() => { radarData.value = null }),
-      getLearningStatistics(cid).then(r => { stats.value = r }).catch(() => { stats.value = null }),
+    const [pRes, rRes, sRes] = await Promise.all([
+      getMyProfile(cid).catch(() => null),
+      getRadarData(cid).catch(() => null),
+      getLearningStatistics(cid).catch(() => null),
       fetchGrowthTrack(),
     ])
+    
+    profile.value = pRes
+    radarData.value = rRes
+    stats.value = sRes
+
+    // 如果没有画像，尝试实时计算一次（仅在详情态触发）
+    const noProfile = !profile.value || (profile.value as any).exists === false
+    if (noProfile && !calculating.value) {
+      doCalculate()
+    }
     await nextTick()
     initRadarChart()
     initLineChart()

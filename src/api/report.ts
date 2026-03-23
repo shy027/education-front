@@ -54,12 +54,26 @@ export interface GrowthTrackResponse {
   trend?: string
 }
 
+export interface BehaviorStat {
+  count: number
+  uniqueCount: number
+  totalDuration: number
+  avgScore: number
+}
+
+export interface StatisticsSummary {
+  totalBehaviors: number
+  activeDays: number
+  avgDailyBehaviors: number
+  participatedCourses: number
+  mostActiveHour: number
+}
+
 export interface StatisticsResponse {
-  totalWatchDuration: number    // 总观看时长（秒）
-  totalPosts: number
-  totalAnswers: number
-  completedCourseware: number
-  totalCourseware: number
+  userId: string
+  courseId: string
+  behaviorStats: Record<string, BehaviorStat>
+  summary: StatisticsSummary
 }
 
 export interface ReportDTO {

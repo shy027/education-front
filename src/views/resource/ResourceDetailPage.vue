@@ -7,47 +7,22 @@
       <!-- ===== 左侧主内容 ===== -->
       <div class="main-content">
 
-        <!-- 资源头部info -->
+        <!-- 资源头部 (顶部显示封面与基本信息) -->
         <div class="resource-hero">
           <div class="hero-left">
-            <!-- 封面 / 媒体预览器 -->
             <div class="media-box" :class="`bg-type-${resource.resourceType}`">
-              <!-- 视频播放 -->
-              <video
-                v-if="previewType === 'video' && previewUrl"
-                :key="previewUrl"
-                :src="previewUrl"
-                controls
-                class="video-player"
-                @play="trackView"
-              />
-              <!-- 文档预览 (PDF/Office) -->
-              <iframe
-                v-else-if="previewType === 'doc' && previewUrl"
-                :key="previewUrl"
-                :src="previewUrl"
-                class="doc-viewer"
-                frameborder="0"
-              ></iframe>
-              <!-- 图片封面 (文章或无预览文件时) -->
               <img
-                v-else-if="resource.coverUrl && previewType === 'none'"
+                v-if="resource.coverUrl"
                 :src="resource.coverUrl"
                 :alt="resource.title"
                 class="cover-img"
               />
-              <!-- 音频播放器 (在 Hero 预览区显示) -->
-              <div v-else-if="previewType === 'audio' && previewUrl" class="audio-hero-wrap">
-                <audio ref="audioRef" :key="previewUrl" :src="previewUrl" controls class="audio-player-hero" @play="trackView" />
-              </div>
-              <!-- 默认图标 -->
               <div v-else class="media-fallback">
                 <el-icon :size="64" color="rgba(255,255,255,0.8)"><component :is="typeIcon(resource.resourceType)" /></el-icon>
               </div>
             </div>
           </div>
 
-          <!-- 资源基本信息 -->
           <div class="hero-right">
             <div class="type-badge-row">
               <span class="type-badge" :class="`type-${resource.resourceType}`">{{ typeLabel(resource.resourceType) }}</span>
@@ -56,90 +31,27 @@
             <h1 class="resource-title">{{ resource.title }}</h1>
             <p v-if="resource.summary" class="resource-summary">{{ resource.summary }}</p>
 
-            <!-- 元数据 -->
             <div class="meta-grid">
-              <div class="meta-item">
-                <el-icon><User /></el-icon>
-                <span class="meta-label">发布者</span>
-                <span>{{ resource.creatorName }}</span>
-              </div>
-              <div class="meta-item">
-                <el-icon><View /></el-icon>
-                <span class="meta-label">浏览量</span>
-                <span>{{ resource.viewCount }}</span>
-              </div>
-              <div class="meta-item">
-                <el-icon><Clock /></el-icon>
-                <span class="meta-label">发布时间</span>
-                <span>{{ resource.createdTime?.slice(0, 10) }}</span>
-              </div>
+              <div class="meta-item"><el-icon><User /></el-icon><span class="meta-label">发布者</span><span>{{ resource.creatorName }}</span></div>
+              <div class="meta-item"><el-icon><View /></el-icon><span class="meta-label">浏览量</span><span>{{ resource.viewCount }}</span></div>
+              <div class="meta-item"><el-icon><Clock /></el-icon><span class="meta-label">发布日期</span><span>{{ resource.createdTime?.slice(0, 10) }}</span></div>
             </div>
 
-            <!-- 标签 -->
             <div v-if="resource.tags?.length" class="tag-row">
-              <el-tag
-                v-for="tag in resource.tags"
-                :key="tag.id"
-                type="danger"
-                size="small"
-                class="res-tag"
-                effect="plain"
-              >{{ tag.tagName }}</el-tag>
+              <el-tag v-for="tag in resource.tags" :key="tag.id" type="danger" size="small" class="res-tag" effect="plain">{{ tag.tagName }}</el-tag>
             </div>
 
-            <!-- 操作按钮 -->
             <div class="action-row">
-              <!-- 文档/PDF 下载按钮 -->
-              <el-button
-                v-if="currentFile && resource.resourceType !== 2"
-                type="primary"
-                class="red-btn"
-                :icon="Download"
-                @click="handleDownload"
-              >
-                {{ resource.resourceType === 3 ? '下载文档' : resource.resourceType === 4 ? '下载音频' : '下载文件' }}
-              </el-button>
-
-              <!-- 教师/管理员：编辑/审核 -->
               <template v-if="canEdit">
                 <el-button :icon="Edit" @click="router.push({ name: 'ResourceEdit', params: { id: resourceId } })">编辑</el-button>
-                <el-button
-                  v-if="resource.status === 0 || resource.status === 3"
-                  type="warning"
-                  @click="handleSubmitAudit"
-                >提交审核</el-button>
-                <el-button
-                  v-if="resource.status === 2"
-                  type="danger"
-                  plain
-                  @click="handleOffline"
-                >下架</el-button>
+                <el-button v-if="resource.status === 0 || resource.status === 3" type="warning" @click="handleSubmitAudit">提交审核</el-button>
+                <el-button v-if="resource.status === 2" type="danger" plain @click="handleOffline">下架</el-button>
               </template>
-
-              <!-- 管理员审核入口 -->
-              <el-button
-                v-if="authStore.isAdmin && resource.status === 1"
-                type="success"
-                @click="handleAdminAudit(1)"
-              >审核通过</el-button>
-              <el-button
-                v-if="authStore.isAdmin && resource.status === 1"
-                type="danger"
-                plain
-                @click="handleAdminAudit(2)"
-              >审核拒绝</el-button>
+              <template v-if="authStore.isAdmin && resource.status === 1">
+                <el-button type="success" @click="handleAdminAudit(1)">审核通过</el-button>
+                <el-button type="danger" plain @click="handleAdminAudit(2)">审核拒绝</el-button>
+              </template>
             </div>
-
-            <!-- 管理员：审核拒绝原因 -->
-            <el-alert
-              v-if="resource.status === 3"
-              type="error"
-              show-icon
-              :closable="false"
-              title="审核不通过"
-              description="该资源在审核中被拒绝，请修改后重新提交。"
-              style="margin-top: 12px"
-            />
           </div>
         </div>
 
@@ -159,26 +71,52 @@
           <el-empty v-else description="该资源暂无正文内容" :image-size="80" />
         </el-card>
 
-        <!-- 资源附件列表 (如果是文件类或有附件则显示) -->
-        <el-card v-if="resource.attachments?.length" class="attachments-card" shadow="never">
+        <!-- 在线预览区 (已移除附件列表，直接显示预览) -->
+        <el-card v-if="previewUrl && resource.resourceType !== 1" class="preview-card" shadow="never">
           <template #header>
             <div class="card-header">
-              <h3>{{ resource.resourceType === 1 ? '相关附件' : '资源附件' }} ({{ resource.attachments.length }})</h3>
+              <h3>正在学习：{{ currentFile?.fileName || resource.title }}</h3>
             </div>
           </template>
-          <div class="attachment-list">
-            <div
-              v-for="(file, index) in resource.attachments"
-              :key="file.id"
-              class="attachment-item"
-              :class="{ active: selectedAttachIdx === index }"
-            >
-              <el-icon><Document /></el-icon>
-              <span class="file-name" :title="file.fileName">{{ file.fileName }}</span>
-              <div class="attach-actions">
-                <el-button type="primary" link @click="selectedAttachIdx = index">在线预览</el-button>
-                <el-button type="info" link @click="handleFileDownload(file.fileUrl, file.fileName)">下载</el-button>
-              </div>
+          <div class="media-previewer">
+            <!-- 视频播放 -->
+            <video
+              v-if="previewType === 'video'"
+              :key="previewUrl"
+              :src="previewUrl"
+              controls
+              autoplay
+              class="video-player"
+              @play="trackView"
+            />
+            <!-- PDF 预览 (使用 PDF.js 渲染库) -->
+            <div v-else-if="previewType === 'pdf'" ref="pdfContainer" class="pdf-viewer-container">
+              <vue-pdf-embed 
+                v-if="pdfSource" 
+                :source="pdfSource" 
+                :width="containerWidth > 0 ? containerWidth : undefined"
+                class="pdf-render" 
+              />
+              <div v-else v-loading="loadingPdf" class="pdf-loading">正在加载文档流...</div>
+            </div>
+            <!-- Office 预览 -->
+            <iframe
+              v-else-if="previewType === 'office'"
+              :key="previewUrl"
+              :src="previewUrl"
+              class="doc-viewer"
+              frameborder="0"
+              allowfullscreen
+            ></iframe>
+            <!-- 音频播放 -->
+            <div v-else-if="previewType === 'audio'" class="audio-preview-wrap">
+              <el-icon :size="80" class="audio-icon"><Headset /></el-icon>
+              <audio ref="audioRef" :key="previewUrl" :src="previewUrl" controls class="audio-player" @play="trackView" />
+              <div class="playing-hint">正在播放音频：{{ currentFile?.fileName || resource.title }}</div>
+            </div>
+            <!-- 其它 -->
+            <div v-else class="stage-fallback">
+              <el-icon :size="100" color="rgba(0,0,0,0.1)"><component :is="typeIcon(resource.resourceType)" /></el-icon>
             </div>
           </div>
         </el-card>
@@ -213,8 +151,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, markRaw, onMounted } from 'vue'
+import { ref, reactive, computed, markRaw, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useElementSize } from '@vueuse/core'
+import axios from '@/utils/request'
+import VuePdfEmbed from 'vue-pdf-embed'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft, View, User, Clock, Download, Edit, Headset,
@@ -233,6 +174,9 @@ const router = useRouter()
 const authStore = useAuthStore()
 const resourceId = computed(() => route.params.id as string)
 
+const pdfContainer = ref<HTMLElement | null>(null)
+const { width: containerWidth } = useElementSize(pdfContainer)
+
 // ─── 资源详情 ───
 const loading = ref(false)
 const resource = ref<ResourceItem | null>(null)
@@ -250,7 +194,7 @@ const canEdit = computed(() => {
 function typeIcon(t: number) { return { 1: markRaw(Document), 2: markRaw(VideoPlay), 3: markRaw(Document), 4: markRaw(Headset) }[t] ?? markRaw(Document) }
 function typeLabel(t: number): string { return { 1: '文章', 2: '视频', 3: '文档', 4: '音频' }[t] ?? '资源' }
 
-const selectedAttachIdx = ref(-1) // 初始为 -1，不自动触发预览以防自动下载
+const selectedAttachIdx = ref(0) // 默认开启首个附件预览
 
 const currentFile = computed(() => {
   // 注意：index=-1 时一定返回 null，避免 attachments[-1] 为 undefined 时 || 兜底到 attachments[0]
@@ -258,34 +202,76 @@ const currentFile = computed(() => {
   return resource.value.attachments[selectedAttachIdx.value] ?? null
 })
 
+
+
+const pdfSource = ref('')
+const loadingPdf = ref(false)
+
+// 为了带上 JWT Token，通过 axios 请求后端代理接口获取 PDF 二进制流
+watch(() => currentFile.value, async (file) => {
+  // 清理上一份预览产生的 Blob
+  if (pdfSource.value && pdfSource.value.startsWith('blob:')) {
+    URL.revokeObjectURL(pdfSource.value)
+    pdfSource.value = ''
+  }
+  if (!file) return
+
+  const isPdf = file.fileName?.toLowerCase().endsWith('.pdf') || 
+                file.fileUrl.split('?')[0].toLowerCase().endsWith('.pdf')
+  
+  if (isPdf) {
+    loadingPdf.value = true
+    try {
+      // 通过已经带了 Authorization 拦截器的 axios 请求后端代理
+      // 注意：这里的 axios 已由 import axios from '@/utils/request' 注入
+      const proxyUrl = `/v1/upload/pdf-proxy?fileUrl=${encodeURIComponent(file.fileUrl)}`
+      const res = await axios.get(proxyUrl, { 
+        responseType: 'blob',
+      })
+      // 检查 res 是否为 Blob, 因为拦截器可能已经解包了 res.data 为 res
+      // 在我们的 request.ts 中，成功时返回了 res.data as never
+      // 但对于 responseType: 'blob'，解包后的内容就是 blob 对象本身
+      const blob = new Blob([res as any], { type: 'application/pdf' })
+      pdfSource.value = URL.createObjectURL(blob)
+    } catch (e) {
+      console.error('PDF 文档流下载失败', e)
+      ElMessage.error('无法加载该文档预览，请检查网络或登录状态')
+    } finally {
+      loadingPdf.value = false
+    }
+  }
+}, { immediate: true })
+
 const previewUrl = computed(() => {
   const url = currentFile.value?.fileUrl
   if (!url) return ''
 
-  // 移除查询参数进行后缀判断
+  const fileName = currentFile.value?.fileName?.toLowerCase() || ''
   const pureUrl = url.split('?')[0].toLowerCase()
+  
+  // Office 预览逻辑保持不变（微软服务无法带我们的 Token，故仅适用于公开或临时签名的 URL）
   const isOffice = pureUrl.endsWith('.ppt') || pureUrl.endsWith('.pptx') || 
                    pureUrl.endsWith('.doc') || pureUrl.endsWith('.docx') || 
                    pureUrl.endsWith('.xls') || pureUrl.endsWith('.xlsx')
   
   if (isOffice && url.startsWith('http')) {
-    // 确保 URL 是全路径且编码
     return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`
   }
+  
   return url
 })
 
 const previewType = computed(() => {
   const file = currentFile.value
-  if (!file || selectedAttachIdx.value === -1) return 'none'
+  if (!file) return 'none'
   
-  const url = file.fileUrl.toLowerCase()
-  const pureUrl = url.split('?')[0]
+  const fileName = file.fileName?.toLowerCase() || ''
+  const pureUrl = file.fileUrl.split('?')[0].toLowerCase()
 
-  if (pureUrl.endsWith('.mp4') || pureUrl.endsWith('.webm') || pureUrl.endsWith('.ogg')) return 'video'
+  if (pureUrl.endsWith('.mp4') || pureUrl.endsWith('.webm')) return 'video'
   if (pureUrl.endsWith('.mp3') || pureUrl.endsWith('.wav')) return 'audio'
-  if (pureUrl.endsWith('.pdf')) return 'doc'
-  if (previewUrl.value.includes('officeapps.live.com')) return 'doc'
+  if (fileName.endsWith('.pdf') || pureUrl.endsWith('.pdf')) return 'pdf'
+  if (previewUrl.value.includes('officeapps.live.com')) return 'office'
 
   return 'none'
 })
@@ -324,32 +310,7 @@ function trackView() {
   }
 }
 
-// ─── 下载 ───
-function handleDownload() {
-  if (!currentFile.value?.fileUrl) return
-  handleFileDownload(currentFile.value.fileUrl, currentFile.value.fileName || '文件')
-}
-
-function handleFileDownload(url: string, name: string) {
-  // 记录下载行为
-  if (authStore.userInfo?.userId && !authStore.isTeacher && !authStore.isAdmin) {
-    logBehavior({
-      userId: authStore.userInfo.userId,
-      courseId: '0',
-      behaviorType: 'RESOURCE_DOWNLOAD',
-      behaviorObjectId: resourceId.value,
-    }).catch(() => {})
-  }
-
-  // 构建下载
-  const link = document.createElement('a')
-  link.href = url
-  link.download = name
-  link.target = '_blank'
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-}
+// ─── 下载逻辑已移除 ───
 
 // ─── 提交审核 ───
 async function handleSubmitAudit() {
@@ -404,7 +365,7 @@ onMounted(async () => {
 /* ===== 主内容 ===== */
 .main-content { display: flex; flex-direction: column; gap: 16px; }
 
-/* ===== 资源头部 ===== */
+/* ===== 资源头部 (还原经典布局) ===== */
 .resource-hero {
   background: #fff;
   border-radius: 16px;
@@ -415,7 +376,6 @@ onMounted(async () => {
 }
 
 .hero-left { flex-shrink: 0; width: 340px; }
-
 .media-box {
   width: 340px; height: 200px;
   border-radius: 12px; overflow: hidden;
@@ -426,54 +386,53 @@ onMounted(async () => {
 .bg-type-3 { background: linear-gradient(135deg, #2e7d32, #66bb6a); }
 .bg-type-4 { background: linear-gradient(135deg, #e65100, #ffa726); }
 
-.video-player { width: 100%; height: 100%; object-fit: contain; background: #000; }
-.doc-viewer { width: 100%; height: 100%; background: #f5f5f5; border: none; }
 .cover-img { width: 100%; height: 100%; object-fit: cover; }
 .media-fallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
 
 .hero-right { flex: 1; min-width: 0; }
 
 .type-badge-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-
-.type-badge {
-  font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 12px;
-}
+.type-badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 12px; }
 .type-1 { background: #ffebee; color: #d32f2f; }
 .type-2 { background: #e3f2fd; color: #1976d2; }
 .type-3 { background: #e8f5e9; color: #388e3c; }
 .type-4 { background: #fff3e0; color: #f57c00; }
 
-.resource-title {
-  margin: 0 0 10px;
-  font-size: 22px; font-weight: 800; color: #1a1a1a; line-height: 1.4;
-}
-
-.resource-summary {
-  margin: 0 0 14px;
-  font-size: 14px; color: #546e7a; line-height: 1.7;
-}
+.resource-title { margin: 0 0 10px; font-size: 22px; font-weight: 800; color: #1a1a1a; line-height: 1.4; }
+.resource-summary { margin: 0 0 14px; font-size: 14px; color: #546e7a; line-height: 1.7; }
 
 .meta-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
-
-.meta-item {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 13px; color: #546e7a;
-}
+.meta-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #546e7a; }
 .meta-item .el-icon { color: #d32f2f; }
 .meta-label { color: #90a4ae; min-width: 60px; }
 
 .tag-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
-.res-tag { margin: 0; }
-
 .action-row { display: flex; gap: 10px; flex-wrap: wrap; }
 
-.red-btn {
-  background: linear-gradient(135deg, #ff5252, #d32f2f) !important;
-  border: none !important; border-radius: 8px !important;
+/* ===== 底部预览区 (新) ===== */
+.preview-card { border-radius: 14px !important; margin-bottom: 16px; overflow: hidden; }
+:deep(.preview-card .el-card__body) { padding: 0; }
+
+.media-previewer {
+  width: 100%;
+  height: 950px;
+  background: #f5f5f5;
+  /* 移除 flex 居中，防止子容器收缩 */
+  display: block;
 }
 
-.audio-hero-wrap { width: 100%; padding: 20px; }
-.audio-player-hero { width: 100%; }
+.video-player { width: 100%; height: 100%; max-height: 600px; background: #000; }
+.doc-viewer { width: 100%; height: 100%; border: none; background: #fff; }
+
+.audio-preview-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 20px;
+  padding: 40px; width: 100%; max-width: 500px;
+}
+.audio-icon { color: #90a4ae; opacity: 0.3; }
+.audio-player { width: 100%; }
+.playing-hint { font-size: 14px; color: #90a4ae; }
+
+.stage-fallback { opacity: 0.5; }
 
 /* 附件卡片 */
 .attachments-card { border-radius: 14px !important; margin-top: 4px; }
@@ -546,6 +505,31 @@ onMounted(async () => {
 .log-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .log-auditor { font-weight: 600; color: #455a64; }
 .log-comment { color: #78909c; margin-left: 6px; }
+
+/* ===== PDF 预览样式 ===== */
+.pdf-viewer-container {
+  width: 100%; /* 必须撑满父级 */
+  height: 950px;
+  overflow-y: auto;
+  background: #525659;
+  border-radius: 8px;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.pdf-render {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  background: #fff;
+}
+
+.pdf-loading {
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
 
 @media (max-width: 1000px) {
   .resource-hero { flex-direction: column; }

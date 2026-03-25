@@ -36,7 +36,12 @@ service.interceptors.request.use(
 
 // 响应拦截器 —— 统一解包 & 错误处理
 service.interceptors.response.use(
-  (response: AxiosResponse<ApiResponse>) => {
+  (response: AxiosResponse) => {
+    // 处理文件流/二进制流响应：直接返回原始数据
+    if (response.config.responseType === 'blob' || response.config.responseType === 'arraybuffer') {
+      return response.data
+    }
+
     const res = response.data
     if (res.code === 200) {
       return res.data as never

@@ -183,14 +183,14 @@ const typeIconMap: Record<number, ReturnType<typeof markRaw>> = {
 }
 
 const fileAccept = computed(() => {
-  return { 2: 'video/*', 3: '.pdf,.doc,.docx,.ppt,.pptx', 4: 'audio/*' }[form.resourceType] ?? ''
+  return { 2: 'video/*', 3: '.pdf', 4: 'audio/*' }[form.resourceType] ?? ''
 })
 
 const fileTypeTip = computed(() => {
   return {
     2: '支持 mp4/avi/mov，建议 ≤500MB',
-    3: '支持 pdf/doc/docx/ppt/pptx，≤50MB',
-    4: '支持 mp3/m4a/wav，≤100MB',
+    3: '仅支持 PDF 格式，建议 ≤50MB',
+    4: '支持 mp3/m4a/wav，建议 ≤100MB',
   }[form.resourceType] ?? ''
 })
 

@@ -107,7 +107,7 @@
           <!-- 右：课件及资源列表 -->
           <div class="ware-list-wrap">
             <div class="ware-list-header">
-              <span>{{ selectedChapterId ? '课件与资源列表' : '全部课件与资源' }}</span>
+              <span>{{ selectedChapterId ? '本章节内容管理' : '全课程内容概览' }}</span>
               <div v-if="isMyTeaching && !isCourseFinished && selectedChapterId" style="display: flex; gap: 10px;">
                 <el-button type="primary" size="small" :icon="Plus" class="red-sm-btn" @click="openAddWareDialog">
                   上传课件
@@ -117,52 +117,64 @@
                 </el-button>
               </div>
             </div>
+
             <div v-if="wares.length === 0 && selectedChapterResources.length === 0" class="ware-empty">
               <el-empty :description="selectedChapterId ? '该章节暂无内容' : '暂无课件或资源'" :image-size="60" />
             </div>
-            
-            <div
-              v-for="w in wares"
-              :key="w.id"
-              class="ware-item"
-              @click="openWare(w)"
-            >
-              <div class="ware-icon" :class="`type-${w.wareType}`">
-                <el-icon><component :is="wareIcon(w.wareType)" /></el-icon>
-              </div>
-              <div class="ware-info">
-                <div class="ware-title">{{ w.wareTitle }}</div>
-                <div class="ware-meta">
-                  <el-tag size="small" :type="wareAuditType(w.auditStatus)">{{ wareAuditLabel(w.auditStatus) }}</el-tag>
-                  <span v-if="w.duration">{{ Math.floor(w.duration / 60) }}min</span>
-                </div>
-              </div>
-              <div v-if="w.progress !== undefined" class="ware-progress">
-                <el-progress :percentage="w.progress" :stroke-width="4" :show-text="false" color="#d32f2f" style="width:80px" />
-                <span class="progress-text">{{ w.progress }}%</span>
-              </div>
-              <el-button v-if="w.allowDownload === 1 && canInteract" text type="primary" size="small" :icon="Download" @click.stop="downloadWare(w)">下载</el-button>
-              <el-button v-if="isMyTeaching && !isCourseFinished" text type="danger" size="small" :icon="Delete" @click.stop="deleteWareById(w.id)" />
-            </div>
 
-            <!-- 选定章节关联共享资源列表 -->
-            <div
-              v-for="res in selectedChapterResources"
-              :key="res.resourceId"
-              class="ware-item bound-resource"
-              @click="openChapterResource(res)"
-            >
-              <div class="ware-icon" :class="`type-${res.resourceType}`">
-                <el-icon><component :is="wareIcon(res.resourceType)" /></el-icon>
+            <!-- 1. 课件列表区块 -->
+            <template v-if="wares.length > 0">
+              <div class="ware-section-title">
+                <el-icon><Reading /></el-icon> 本章课件
               </div>
-              <div class="ware-info">
-                <div class="ware-title">{{ res.title }} <el-tag size="small" effect="plain" type="info" style="margin-left: 8px;">共享资源</el-tag></div>
-                <div class="ware-meta">
-                  <span>关联于: {{ res.bindTime?.slice(0, 10) }}</span>
+              <div
+                v-for="w in wares"
+                :key="w.id"
+                class="ware-item"
+                @click="openWare(w)"
+              >
+                <div class="ware-icon" :class="`type-${w.wareType}`">
+                  <el-icon><component :is="wareIcon(w.wareType)" /></el-icon>
                 </div>
+                <div class="ware-info">
+                  <div class="ware-title">{{ w.wareTitle }}</div>
+                  <div class="ware-meta">
+                    <el-tag size="small" :type="wareAuditType(w.auditStatus)">{{ wareAuditLabel(w.auditStatus) }}</el-tag>
+                    <span v-if="w.duration">{{ Math.floor(w.duration / 60) }}min</span>
+                  </div>
+                </div>
+                <div v-if="w.progress !== undefined" class="ware-progress">
+                  <el-progress :percentage="w.progress" :stroke-width="4" :show-text="false" color="#d32f2f" style="width:80px" />
+                  <span class="progress-text">{{ w.progress }}%</span>
+                </div>
+                <el-button v-if="w.allowDownload === 1 && canInteract" text type="primary" size="small" :icon="Download" @click.stop="downloadWare(w)">下载</el-button>
+                <el-button v-if="isMyTeaching && !isCourseFinished" text type="danger" size="small" :icon="Delete" @click.stop="deleteWareById(w.id)" />
               </div>
-              <el-button v-if="isMyTeaching && !isCourseFinished" text type="danger" size="small" :icon="Delete" @click.stop="toggleBindResource({id: res.resourceId} as any)">取消</el-button>
-            </div>
+            </template>
+
+            <!-- 2. 关联共享资源区块 -->
+            <template v-if="selectedChapterResources.length > 0">
+              <div class="ware-section-title resource-section">
+                <el-icon><Link /></el-icon> 关联共享资源
+              </div>
+              <div
+                v-for="res in selectedChapterResources"
+                :key="res.resourceId"
+                class="ware-item bound-resource"
+                @click="openChapterResource(res)"
+              >
+                <div class="ware-icon" :class="`type-${res.resourceType}`">
+                  <el-icon><component :is="wareIcon(res.resourceType)" /></el-icon>
+                </div>
+                <div class="ware-info">
+                  <div class="ware-title">{{ res.title }} <el-tag size="small" effect="plain" type="info" style="margin-left: 8px;">共享资源</el-tag></div>
+                  <div class="ware-meta">
+                    <span>关联于: {{ res.bindTime?.slice(0, 10) }}</span>
+                  </div>
+                </div>
+                <el-button v-if="isMyTeaching && !isCourseFinished" text type="danger" size="small" :icon="Delete" @click.stop="toggleBindResource({id: res.resourceId} as any)">取消</el-button>
+              </div>
+            </template>
           </div>
         </div>
       </el-tab-pane>
@@ -377,7 +389,7 @@
         <div style="margin-top: 16px; display: flex; justify-content: space-between; align-items: center;">
           <div style="display: flex; gap: 10px; align-items: center;">
             <el-button type="primary" :icon="MagicStick" :loading="aiRecommendLoading" @click="fetchAiRecommendations">
-              基于课程信息推荐
+              基于章节课件推荐
             </el-button>
             <el-upload
               :auto-upload="true"
@@ -817,9 +829,19 @@ function applyAiResult() {
 
 /** 获取 AI 推荐资源 */
 async function fetchAiRecommendations() {
+  if (!selectedChapterId.value) {
+    return ElMessage.warning('请先在左侧选择具体章节，以便 AI 基于章节课件进行精准推荐')
+  }
+
+  // 检查当前章节是否有可作为推荐依据的课件 (PDF:2, PPT:3)
+  const hasKnowledgeMaterial = wares.value.some(w => w.wareType === 2 || w.wareType === 3)
+  if (!hasKnowledgeMaterial) {
+    return ElMessage.warning('该章节暂无 PDF 或 PPT 课件，无法进行基于文档的内容推荐')
+  }
+
   aiRecommendLoading.value = true
   try {
-    const res = await getAiResourceRecommendations(Number(courseId.value))
+    const res = await getAiResourceRecommendations(Number(courseId.value), Number(selectedChapterId.value))
     aiRecommendResult.value = res
     if (res.recommendations.length === 0) {
       ElMessage.info('AI 暂未发现更合适的推荐资源')
@@ -1742,6 +1764,27 @@ onMounted(async () => {
   font-weight: 600;
   color: #455a64;
   margin-bottom: 12px;
+}
+
+.ware-section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #333;
+  margin: 24px 0 16px;
+  padding-left: 12px;
+  border-left: 4px solid #d32f2f;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(to right, #fff8f8, transparent);
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.ware-section-title.resource-section {
+  border-left-color: #67c23a;
+  margin-top: 32px;
+  background: linear-gradient(to right, #f0f9eb, transparent);
 }
 
 .ware-item {

@@ -44,11 +44,13 @@ export function analyzeCourseFile(file: File) {
 /**
  * 获取 AI 资源推荐
  * @param courseId 课程 ID
+ * @param chapterId 章节 ID (可选，若提供则基于章节课件推荐)
  */
-export function getAiResourceRecommendations(courseId: number) {
+export function getAiResourceRecommendations(courseId: number, chapterId?: number) {
   return request<AiRecommendationResponse>({
     url: `/v1/ai/course/${courseId}/recommend-resources`,
-    method: 'get'
+    method: 'get',
+    params: { chapterId }
   })
 }
 

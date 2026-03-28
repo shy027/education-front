@@ -69,9 +69,6 @@
         <el-form-item label="联系电话">
           <el-input v-model="form.contactPhone" clearable />
         </el-form-item>
-        <el-form-item label="邀请码">
-          <el-input v-model="form.inviteCode" clearable placeholder="留空则不限" />
-        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showCreateDialog = false">取消</el-button>
@@ -95,7 +92,6 @@ interface SchoolItem {
   city?: string
   address?: string
   contactPhone?: string
-  inviteCode?: string
   createdTime?: string
 }
 
@@ -108,7 +104,7 @@ async function fetchSchools() {
   loading.value = true
   try {
     const res = await get<PageResponse<SchoolItem>>('/v1/schools', query)
-    schools.value = res?.records || []
+    schools.value = res?.list || []
     total.value = res?.total ?? 0
   } finally { loading.value = false }
 }
@@ -119,7 +115,7 @@ function handleSearch() { query.pageNum = 1; fetchSchools() }
 const showCreateDialog = ref(false)
 const submitting = ref(false)
 const editingSchool = ref<SchoolItem | null>(null)
-const form = reactive({ schoolName: '', province: '', city: '', address: '', contactPhone: '', inviteCode: '' })
+const form = reactive({ schoolName: '', province: '', city: '', address: '', contactPhone: '' })
 
 function editSchool(s: SchoolItem) {
   editingSchool.value = s
@@ -140,7 +136,7 @@ async function handleSubmit() {
     }
     showCreateDialog.value = false
     editingSchool.value = null
-    Object.assign(form, { schoolName: '', province: '', city: '', address: '', contactPhone: '', inviteCode: '' })
+    Object.assign(form, { schoolName: '', province: '', city: '', address: '', contactPhone: '' })
     fetchSchools()
   } finally { submitting.value = false }
 }

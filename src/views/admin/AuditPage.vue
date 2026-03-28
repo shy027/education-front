@@ -132,8 +132,8 @@
       <!-- 分页 -->
       <div class="pagination-wrap">
         <el-pagination
-          v-model:current-page="activeTab === 'history' ? historyQuery.pageNum! : pendingQuery.pageNum!"
-          v-model:page-size="activeTab === 'history' ? historyQuery.pageSize! : pendingQuery.pageSize!"
+          v-model:current-page="currentPage"
+          v-model:page-size="pageSize"
           :total="activeTab === 'history' ? historyTotal : pendingTotal"
           layout="total, prev, pager, next"
           background
@@ -273,15 +273,35 @@ async function fetchHistory() {
   try {
     const res = await getAuditHistory(historyQuery)
     historyList.value = res?.list || res?.records || []
-    historyTotal.value = res?.total ?? 0
   } finally { loading.value = false }
 }
 
+// ───── 分页计算属性 ─────
+const currentPage = computed({
+  get: () => (activeTab.value === 'history' ? historyQuery.pageNum! : pendingQuery.pageNum!),
+  set: (val) => {
+    if (activeTab.value === 'history') historyQuery.pageNum = val
+    else pendingQuery.pageNum = val
+  }
+})
+
+const pageSize = computed({
+  get: () => (activeTab.value === 'history' ? historyQuery.pageSize! : pendingQuery.pageSize!),
+  set: (val) => {
+    if (activeTab.value === 'history') historyQuery.pageSize = val
+    else pendingQuery.pageSize = val
+  }
+})
+
 // ───── 辅助函数 ─────
 function contentTypeLabel(t: string): string { return { COURSEWARE: '课件', POST: '话题', COMMENT: '评论', RESOURCE: '资源' }[t] ?? t }
-function contentTypeTagType(t: string): '' | 'info' | 'success' | 'warning' { return ({ COURSEWARE: '', POST: 'success', COMMENT: 'info', RESOURCE: 'warning' } as Record<string, '' | 'info' | 'success' | 'warning'>)[t] ?? 'info' }
+function contentTypeTagType(t: string): 'primary' | 'info' | 'success' | 'warning' {
+  return ({ COURSEWARE: 'primary', POST: 'success', COMMENT: 'info', RESOURCE: 'warning' } as Record<string, 'primary' | 'info' | 'success' | 'warning'>)[t] ?? 'info'
+}
 function riskLabel(l: number): string { return { 1: '低', 2: '中', 3: '高' }[l] ?? '—' }
-function riskTagType(l: number): '' | 'success' | 'warning' | 'danger' { return ({ 1: 'success', 2: 'warning', 3: 'danger' } as Record<number, '' | 'success' | 'warning' | 'danger'>)[l] ?? '' }
+function riskTagType(l: number): 'info' | 'success' | 'warning' | 'danger' {
+  return ({ 1: 'success', 2: 'warning', 3: 'danger' } as Record<number, 'info' | 'success' | 'warning' | 'danger'>)[l] ?? 'info'
+}
 
 onMounted(fetchPending)
 </script>

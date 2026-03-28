@@ -18,7 +18,7 @@
           <el-button :icon="Upload" :loading="importLoading">批量导入</el-button>
         </el-upload>
         <!-- 导出 -->
-        <el-button :icon="DocumentExport" :loading="exportLoading" @click="handleExport">
+        <el-button :icon="Download" :loading="exportLoading" @click="handleExport">
           导出列表
         </el-button>
       </div>
@@ -229,7 +229,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { UploadRawFile } from 'element-plus'
 import {
-  Search, Refresh, Download, Upload, DocumentExport, View, Key,
+  Search, Refresh, Download, Upload, View, Key,
 } from '@element-plus/icons-vue'
 import {
   getUserList, getUserDetail, updateUserStatus,
@@ -261,11 +261,11 @@ const drawerVisible = ref(false)
 const drawerUser = ref<UserManageItem | null>(null)
 
 // ───── 角色标签颜色 ─────
-function roleTagType(role?: string): '' | 'success' | 'warning' | 'info' | 'danger' {
-  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger'> = {
+function roleTagType(role?: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
+  const map: Record<string, 'primary' | 'success' | 'warning' | 'info' | 'danger'> = {
     ADMIN: 'danger',
     SCHOOL_LEADER: 'warning',
-    TEACHER: '',
+    TEACHER: 'primary',
     ASSISTANT: 'info',
     STUDENT: 'success',
   }
@@ -288,8 +288,8 @@ async function fetchList() {
   loading.value = true
   try {
     const res = await getUserList(query)
-    tableData.value = res?.records || []
-    total.value = res.total
+    tableData.value = res?.list || []
+    total.value = res?.total ?? 0
   } finally {
     loading.value = false
   }

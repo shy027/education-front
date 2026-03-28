@@ -130,8 +130,8 @@ async function fetchList() {
   loading.value = true
   try {
     const res = await getProfileList(query)
-    tableData.value = res.records || []
-    total.value = res.total
+    tableData.value = res.list || res.records || []
+    total.value = res.total || 0
   } finally {
     loading.value = false
   }
@@ -160,7 +160,7 @@ function handleViewDetail(row: any) {
 // ───── 工具 ─────
 function levelType(level: string) {
   if (level === '优秀') return 'success'
-  if (level === '良好') return ''
+  if (level === '良好') return 'primary'
   if (level === '合格') return 'warning'
   return 'info'
 }

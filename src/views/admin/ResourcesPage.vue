@@ -12,7 +12,6 @@
       <div class="filter-row">
         <el-input v-model="query.keyword" placeholder="资源标题关键词" clearable :prefix-icon="Search" style="width:220px" @keyup.enter="handleSearch" @clear="handleSearch" />
         <el-select v-model="query.status" placeholder="状态" clearable style="width:130px" @change="handleSearch">
-          <el-option label="全部" :value="undefined" />
           <el-option label="待审核" :value="1" />
           <el-option label="已发布" :value="2" />
           <el-option label="审核拒绝" :value="3" />

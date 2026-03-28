@@ -192,3 +192,20 @@ export const updateBehaviorWeights = (data: Record<string, number>) =>
 
 export const refreshConfigCache = (configKey: string) =>
   post<void>('/v1/admin/config/refresh', null, { params: { configKey } })
+
+// ===================== 看板统计 =====================
+
+export interface DashboardStats {
+  totalUsers: number
+  totalSchools: number
+  todayGrowth: number
+  totalCourses: number
+  subjectDistribution: Record<string, number>
+  totalResources: number
+  typeDistribution: Record<string, number>
+  pendingAudits: number
+  processedToday: number
+}
+
+export const getDashboardStats = () =>
+  get<DashboardStats>('/v1/admin/dashboard/stats')

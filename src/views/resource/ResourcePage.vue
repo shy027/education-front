@@ -89,7 +89,7 @@
             style="margin-right: 8px"
             @click="toggleDraftMode"
           >
-            {{ query.status === 0 ? '返回列表' : '我的草稿' }}
+            {{ query.statusList?.length ? '返回列表' : '我的草稿' }}
           </el-button>
           <el-button
             v-if="authStore.isTeacher || authStore.isAdmin"
@@ -158,7 +158,7 @@
       <!-- 空状态 -->
       <el-empty
         v-if="!loading && !resources.length"
-        :description="query.status === 0 ? '暂无草稿资源' : '暂无相关资源'"
+        :description="query.statusList?.length ? '暂无草稿或审核中的资源' : '暂无相关资源'"
         :image-size="120"
       >
         <el-button class="publish-btn" v-if="authStore.isTeacher || authStore.isAdmin" @click="$router.push('/resource/create')">
@@ -246,11 +246,13 @@ const enabledTags = ref<TagItem[]>([])
 function selectTag(id: string | undefined) { query.tagId = id; query.pageNum = 1; fetchResources() }
 
 function toggleDraftMode() {
-  if (query.status === 0) {
+  if (query.statusList?.length) {
     query.status = 2
+    query.statusList = undefined
     query.creatorId = undefined
   } else {
-    query.status = 0
+    query.status = undefined // 清空单个状态，改用列表
+    query.statusList = [0, 1, 3] // 草稿、待审核、已拒绝
     query.creatorId = authStore.userInfo?.userId
   }
   handleSearch()

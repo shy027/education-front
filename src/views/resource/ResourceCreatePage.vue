@@ -75,9 +75,23 @@
           <div class="upload-tip">建议尺寸 720×480，支持 jpg/png/webp，≤5MB</div>
         </el-form-item>
 
-        <!-- 文章：正文 -->
-        <el-form-item v-if="form.resourceType === 1" label="正文内容">
-          <el-input v-model="form.content" type="textarea" :rows="12" placeholder="请输入文章正文..." resize="none" />
+        <!-- 文章：正文（富文本编辑器） -->
+        <el-form-item v-if="form.resourceType === 1" label="正文内容" class="editor-form-item">
+          <div class="editor-wrapper">
+            <Toolbar
+              style="border-bottom: 1px solid #e0e0e0"
+              :editor="editorRef"
+              :defaultConfig="toolbarConfig"
+              mode="default"
+            />
+            <Editor
+              style="height: 500px; overflow-y: hidden;"
+              v-model="form.content"
+              :defaultConfig="editorConfig"
+              mode="default"
+              @onCreated="handleCreated"
+            />
+          </div>
         </el-form-item>
 
         <!-- 文件上传（视频/文档/音频） -->
@@ -148,7 +162,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, markRaw, onMounted } from 'vue'
+import { ref, reactive, computed, markRaw, onMounted, onBeforeUnmount, shallowRef } from 'vue'
+import '@wangeditor/editor/dist/css/style.css'
+import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
+import { IDomEditor, IEditorConfig, IToolbarConfig } from '@wangeditor/editor'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules, UploadRawFile } from 'element-plus'
@@ -199,6 +216,39 @@ const formRef = ref<FormInstance>()
 const submitting = ref(false)
 const uploadProgress = ref(0)
 const selectedCategory = ref<string | undefined>(undefined)
+
+// ─── 富文本编辑器配置 ───
+const editorRef = shallowRef<IDomEditor>()
+const toolbarConfig: Partial<IToolbarConfig> = {
+  excludeKeys: ['fullScreen']
+}
+const editorConfig: Partial<IEditorConfig> = {
+  placeholder: '请输入文章正文...',
+  MENU_CONF: {
+    uploadImage: {
+      // 自定义上传
+      async customUpload(file: File, insertFn: any) {
+        try {
+          const res = await uploadResourceImage(file)
+          insertFn(res.fileUrl, res.fileName, res.fileUrl)
+        } catch (err) {
+          ElMessage.error('图片插入失败')
+        }
+      }
+    }
+  }
+}
+
+const handleCreated = (editor: IDomEditor) => {
+  editorRef.value = editor
+}
+
+// 组件销毁时，及时销毁编辑器
+onBeforeUnmount(() => {
+  const editor = editorRef.value
+  if (editor == null) return
+  editor.destroy()
+})
 
 const form = reactive<ResourceCreateReq & { resourceType: number }>({
   title: '',
@@ -341,9 +391,9 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.create-resource-page { display: flex; flex-direction: column; gap: 16px; }
+.create-resource-page { display: flex; flex-direction: column; gap: 16px; padding-bottom: 40px; }
 
-.page-header { display: flex; align-items: center; gap: 16px; }
+.page-header { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; }
 .page-title  { margin: 0; font-size: 20px; font-weight: 700; color: #263238; }
 
 /* ===== 布局 ===== */
@@ -382,19 +432,20 @@ onMounted(async () => {
 
 .upload-tip { font-size: 12px; color: #b0bec5; margin-top: 6px; }
 
-/* ===== 文件拖拽 ===== */
-.file-dragger { width: 100%; }
-
-:deep(.file-dragger .el-upload-dragger) {
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
-  background: #fafafa; border-color: #e0e0e0; border-radius: 12px; padding: 32px;
+/* ===== 富文本编辑器自定义样式 ===== */
+.editor-form-item :deep(.el-form-item__content) {
+  display: block;
 }
-:deep(.file-dragger .el-upload-dragger:hover) { border-color: #d32f2f; background: #fff8f8; }
-
-.dragger-tip { text-align: center; }
-.dragger-tip span { font-size: 14px; color: #546e7a; }
-.dragger-tip em { color: #d32f2f; font-style: normal; }
-.dragger-sub { font-size: 12px; color: #b0bec5; margin-top: 4px; }
+.editor-wrapper {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+.editor-wrapper:focus-within {
+  border-color: #d32f2f;
+}
 
 .file-uploaded { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #388e3c; }
 

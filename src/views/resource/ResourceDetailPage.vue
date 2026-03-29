@@ -102,7 +102,6 @@
             <!-- Office 预览 -->
             <iframe
               v-else-if="previewType === 'office'"
-              :key="previewUrl"
               :src="previewUrl"
               class="doc-viewer"
               frameborder="0"
@@ -255,7 +254,8 @@ const previewUrl = computed(() => {
                    pureUrl.endsWith('.xls') || pureUrl.endsWith('.xlsx')
   
   if (isOffice && url.startsWith('http')) {
-    return `https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(url)}`
+    // 使用 embed.aspx 提高嵌入稳定性，移除其他预览源以规避 CORS 问题
+    return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}&wdAr=0`
   }
   
   return url
@@ -497,8 +497,41 @@ onMounted(async () => {
   line-height: 1.8;
   color: #333;
   min-height: 200px;
+  word-break: break-word;
 }
-/* 移除多余的 `white-space: pre-wrap;` */
+.resource-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 10px 0;
+  display: block;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.resource-content :deep(p) {
+  margin: 1em 0;
+}
+.resource-content :deep(h1), 
+.resource-content :deep(h2), 
+.resource-content :deep(h3), 
+.resource-content :deep(h4), 
+.resource-content :deep(h5) {
+  margin-top: 1.5em;
+  margin-bottom: 0.8em;
+  color: #263238;
+}
+.resource-content :deep(ul), 
+.resource-content :deep(ol) {
+  padding-left: 1.5em;
+  margin: 1em 0;
+}
+.resource-content :deep(blockquote) {
+  border-left: 4px solid #d32f2f;
+  background: #fdf2f2;
+  padding: 12px 20px;
+  margin: 1.5em 0;
+  color: #546e7a;
+  font-style: italic;
+}
 
 /* ===== 审核记录 ===== */
 .audit-logs-card { border-radius: 14px !important; }

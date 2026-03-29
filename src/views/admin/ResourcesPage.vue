@@ -48,7 +48,7 @@
           <template #default="{ row }">
             <el-button text size="small" @click="$router.push(`/resource/${row.id}`)">查看</el-button>
             <template v-if="row.status === 1">
-              <el-button text size="small" type="success" @click="handleAudit(row.id, 2)">通过</el-button>
+              <el-button text size="small" type="success" @click="handleAudit(row.id, 1)">通过</el-button>
               <el-button text size="small" type="danger" @click="handleAuditReject(row.id)">拒绝</el-button>
             </template>
             <el-button v-if="row.status === 2" text size="small" type="warning" @click="handleOffline(row.id)">下架</el-button>
@@ -101,19 +101,20 @@ async function fetchResources() {
 
 function handleSearch() { query.pageNum = 1; fetchResources() }
 
-// 通过审核（auditStatus=2）
-async function handleAudit(id: string, status: number) {
-  await auditResource(id, { auditResult: status })
+// 通过审核（auditResult=1）
+async function handleAudit(id: string, result: number) {
+  await auditResource(id, { auditResult: result })
   ElMessage.success('审核通过')
   fetchResources()
 }
 
-// 拒绝审核（auditStatus=4，需填写理由）
+// 拒绝审核（auditResult=2，需填写理由）
 async function handleAuditReject(id: string) {
   const { value: comment } = await ElMessageBox.prompt('请输入拒绝理由', '审核拒绝', {
     confirmButtonText: '确认拒绝',
     cancelButtonText: '取消',
   })
+  if (comment === undefined) return
   await auditResource(id, { auditResult: 2, auditRemark: comment })
   ElMessage.success('已拒绝')
   fetchResources()

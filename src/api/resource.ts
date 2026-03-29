@@ -49,6 +49,7 @@ export interface ResourceQuery extends PageQuery {
   keyword?: string
   categoryId?: string
   status?: number
+  statusList?: number[]
   creatorId?: string
   tagId?: string
   resourceType?: number

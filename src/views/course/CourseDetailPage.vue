@@ -127,12 +127,13 @@
               <div class="ware-section-title">
                 <el-icon><Reading /></el-icon> 本章课件
               </div>
-              <div
-                v-for="w in wares"
-                :key="w.id"
-                class="ware-item"
-                @click="openWare(w)"
-              >
+                <div
+                  v-for="w in wares"
+                  :key="w.id"
+                  class="ware-item"
+                  :class="{ 'active': selectedWareId === w.id }"
+                  @click="openWare(w)"
+                >
                 <div class="ware-icon" :class="`type-${w.wareType}`">
                   <el-icon><component :is="wareIcon(w.wareType)" /></el-icon>
                 </div>
@@ -175,6 +176,68 @@
                 <el-button v-if="isMyTeaching && !isCourseFinished" text type="danger" size="small" :icon="Delete" @click.stop="toggleBindResource({id: res.resourceId} as any)">取消</el-button>
               </div>
             </template>
+
+            <!-- 3. 在线预览区块 (新) -->
+            <div v-if="selectedWareId" class="preview-section-container">
+              <el-divider>
+                <el-icon><View /></el-icon> 在线预览
+              </el-divider>
+              <el-card class="preview-card" shadow="never">
+                <template #header>
+                  <div class="card-header preview-header">
+                    <div class="header-left">
+                      <el-tag size="small" type="danger" effect="dark" style="margin-right: 10px;">预览中</el-tag>
+                      <span class="preview-title">{{ selectedWare?.wareTitle }}</span>
+                    </div>
+                    <el-button 
+                      circle 
+                      :icon="CircleClose" 
+                      class="close-preview-btn" 
+                      @click="selectedWareId = null; selectedWare = null"
+                    />
+                  </div>
+                </template>
+                <div class="media-previewer">
+                  <!-- 视频播放 -->
+                  <video
+                    v-if="previewType === 'video'"
+                    :key="previewUrl"
+                    :src="previewUrl"
+                    controls
+                    autoplay
+                    class="video-player"
+                  />
+                  <!-- PDF 预览 -->
+                  <div v-else-if="previewType === 'pdf'" ref="pdfContainer" class="pdf-viewer-container">
+                    <vue-pdf-embed 
+                      v-if="pdfSource" 
+                      :source="pdfSource" 
+                      :width="containerWidth > 100 ? containerWidth : undefined"
+                      class="pdf-render" 
+                    />
+                    <div v-else v-loading="loadingPdf" class="pdf-loading">正在加载文档流...</div>
+                  </div>
+                  <!-- Office 预览 -->
+                  <iframe
+                    v-else-if="previewType === 'office'"
+                    :src="previewUrl"
+                    class="doc-viewer"
+                    frameborder="0"
+                    allowfullscreen
+                    allow="autoplay; fullscreen"
+                  ></iframe>
+                  <!-- 音频播放 -->
+                  <div v-else-if="previewType === 'audio'" class="audio-preview-wrap">
+                    <el-icon :size="60" class="audio-icon"><Headset /></el-icon>
+                    <audio :key="previewUrl" :src="previewUrl" controls class="audio-player" />
+                  </div>
+                  <!-- 其它/加载失败 -->
+                  <div v-else class="stage-fallback">
+                    <el-empty description="该格式暂不支持在线预览，请下载查看" />
+                  </div>
+                </div>
+              </el-card>
+            </div>
           </div>
         </div>
       </el-tab-pane>
@@ -715,8 +778,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed, markRaw } from 'vue'
+import { ref, reactive, onMounted, computed, markRaw, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useElementSize } from '@vueuse/core'
+import axios from '@/utils/request'
+import VuePdfEmbed from 'vue-pdf-embed'
 import {
   getCourseDetail,
   updateCourse,
@@ -753,8 +819,9 @@ import { getResourceList, getCategoryTree, getEnabledTags, type ResourceItem, ty
 import { useAuthStore } from '@/stores/auth'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  Reading, User, UserFilled, Edit, Plus, VideoPlay, Document, Headset, FolderOpened,
-  Download, Delete, Link, Search, MagicStick, UploadFilled, Upload, Loading, Check
+  ArrowLeft, View, User, UserFilled, Edit, Plus, VideoPlay, Document, Headset, FolderOpened,
+  Download, Delete, Link, Search, MagicStick, UploadFilled, Upload, Loading, Check,
+  CircleClose
 } from '@element-plus/icons-vue'
 import { logBehavior } from '@/api/report'
 import { analyzeCourseFile, getAiResourceRecommendations, getAiResourceRecommendationsByFile, type AiCourseAnalysisResponse, type AiRecommendationResponse } from '@/api/ai'
@@ -772,6 +839,78 @@ const isMember = ref(false)
 const joining = ref(false)
 const quitting = ref(false)
 const showEditDialog = ref(false)
+
+// ───── 课件预览相关 ─────
+const pdfContainer = ref<HTMLElement | null>(null)
+const { width: containerWidth } = useElementSize(pdfContainer)
+const selectedWareId = ref<string | null>(null)
+const selectedWare = ref<CoursewareItem | null>(null)
+const pdfSource = ref('')
+const loadingPdf = ref(false)
+
+const previewUrl = computed(() => {
+  const url = selectedWare.value?.fileUrl
+  if (!url) return ''
+
+  const fileName = selectedWare.value?.wareTitle?.toLowerCase() || ''
+  const pureUrl = url.split('?')[0].toLowerCase()
+  
+  // Office 预览逻辑: PPT/DOC/XLS
+  const isOffice = pureUrl.endsWith('.ppt') || pureUrl.endsWith('.pptx') || 
+                   pureUrl.endsWith('.doc') || pureUrl.endsWith('.docx') || 
+                   pureUrl.endsWith('.xls') || pureUrl.endsWith('.xlsx') ||
+                   selectedWare.value?.wareType === 3
+  
+  if (isOffice && url.startsWith('http')) {
+    // 使用 embed.aspx，此模式专为 Iframe 嵌入设计，交互更平滑，且较少出现脚本定义冲突
+    return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}&wdAr=0`
+  }
+  
+  return url
+})
+
+const previewType = computed(() => {
+  const w = selectedWare.value
+  if (!w) return 'none'
+  
+  const pureUrl = w.fileUrl?.split('?')[0].toLowerCase() || ''
+
+  if (w.wareType === 1 || pureUrl.endsWith('.mp4') || pureUrl.endsWith('.webm')) return 'video'
+  if (w.wareType === 4 || pureUrl.endsWith('.mp3') || pureUrl.endsWith('.wav')) return 'audio'
+  if (w.wareType === 2 || pureUrl.endsWith('.pdf')) return 'pdf'
+  if (previewUrl.value.includes('officeapps.live.com')) return 'office'
+
+  return 'none'
+})
+
+// PDF 代理加载逻辑
+watch(() => selectedWare.value, async (newWare) => {
+  // 清理上一份预览产生的 Blob
+  if (pdfSource.value && pdfSource.value.startsWith('blob:')) {
+    URL.revokeObjectURL(pdfSource.value)
+    pdfSource.value = ''
+  }
+  if (!newWare) return
+
+  const isPdf = newWare.wareType === 2 || 
+                newWare.fileUrl?.toLowerCase().endsWith('.pdf') || 
+                newWare.fileUrl?.split('?')[0].toLowerCase().endsWith('.pdf')
+  
+  if (isPdf && newWare.fileUrl) {
+    loadingPdf.value = true
+    try {
+      const proxyUrl = `/v1/upload/pdf-proxy?fileUrl=${encodeURIComponent(newWare.fileUrl)}`
+      const res = await axios.get(proxyUrl, { responseType: 'blob' })
+      const blob = new Blob([res as any], { type: 'application/pdf' })
+      pdfSource.value = URL.createObjectURL(blob)
+    } catch (e) {
+      console.error('PDF 文档流下载失败', e)
+      ElMessage.error('无法加载该文档预览')
+    } finally {
+      loadingPdf.value = false
+    }
+  }
+})
 
 const isMyTeaching = computed(() =>
   authStore.isTeacher && String(course.value?.teacherId) === String(authStore.userInfo?.userId),
@@ -1310,15 +1449,10 @@ function wareAuditLabel(status: number): string {
 }
 
 function openWare(w: CoursewareItem) {
-  if (w.fileUrl) {
-    const isOfficeFile = w.wareType === 3 || w.fileUrl.endsWith('.ppt') || w.fileUrl.endsWith('.pptx') || w.fileUrl.endsWith('.doc') || w.fileUrl.endsWith('.docx') || w.fileUrl.endsWith('.xls') || w.fileUrl.endsWith('.xlsx');
-    if (isOfficeFile && w.fileUrl.startsWith('http')) {
-      // 微软官方的在线文档预览服务（要求文件 URL 是公网可访问的）
-      window.open(`https://view.officeapps.live.com/op/view.aspx?src=${encodeURIComponent(w.fileUrl)}`, '_blank')
-    } else {
-      window.open(w.fileUrl, '_blank')
-    }
-  }
+  // 保存选中的课件，触发展示预览区域
+  selectedWareId.value = w.id
+  selectedWare.value = w
+
   // 学生行为埋点：上报观看课件行为
   if (!authStore.isTeacher && !authStore.isAdmin && authStore.userInfo?.userId) {
     const behaviorType = w.wareType === 1 ? 'WATCH_VIDEO' : 'READ_DOC'
@@ -1799,6 +1933,11 @@ onMounted(async () => {
   margin-bottom: 8px;
 }
 .ware-item:hover { border-color: #ffcdd2; background: #fff8f8; }
+.ware-item.active {
+  border-color: #d32f2f;
+  background: #fff8f8;
+  box-shadow: 0 4px 12px rgba(211, 47, 47, 0.1);
+}
 
 .ware-icon {
   width: 40px;
@@ -1959,6 +2098,121 @@ onMounted(async () => {
   color: #fff; opacity: 0; font-size: 24px; transition: opacity 0.2s;
 }
 .cover-preview:hover .cover-edit-mask { opacity: 1; }
+
+/* ===== 课程预览区样式 ===== */
+.preview-section-container {
+  margin-top: 32px;
+  animation: fadeIn 0.4s ease-out;
+}
+
+.preview-card {
+  border-radius: 14px;
+  border: 1px solid #f0f0f0;
+  overflow: hidden;
+}
+
+:deep(.preview-card .el-card__header) {
+  padding: 10px 20px;
+  background-color: #fcfcfc;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.preview-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #263238;
+}
+
+.close-preview-btn {
+  border: none;
+  background: transparent;
+  color: #90a4ae;
+  font-size: 20px;
+  transition: all 0.3s;
+}
+.close-preview-btn:hover {
+  background: #ffebee;
+  color: #d32f2f;
+  transform: rotate(90deg);
+}
+
+.media-previewer {
+  width: 100%;
+  min-height: 400px;
+  height: 950px; /* Synchronized with ResourceDetail */
+  background: #f5f5f5;
+  /* 匹配资源库布局，使用 block 而非 flex */
+  display: block;
+  overflow: hidden;
+}
+
+.video-player {
+  width: 100%;
+  height: 100%;
+  max-height: 600px;
+  background: #000;
+}
+
+.doc-viewer {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #fff;
+}
+
+.pdf-viewer-container {
+  width: 100%;
+  height: 100%; /* Fill the 950px previewer */
+  overflow-y: auto;
+  background: #525659;
+  border-radius: 4px;
+  display: flex;
+  justify-content: center;
+}
+
+.pdf-render {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  background: #fff;
+}
+
+.pdf-loading {
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.audio-preview-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 60px 0;
+  width: 100%;
+}
+.audio-icon { color: #d32f2f; opacity: 0.6; }
+.audio-player { width: 80%; max-width: 500px; }
+
+.stage-fallback {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 </style>
 
 <style scoped>

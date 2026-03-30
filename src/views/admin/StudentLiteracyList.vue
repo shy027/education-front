@@ -11,9 +11,42 @@
     <!-- 筛选条件 -->
     <el-card class="filter-card" shadow="never">
       <el-form :model="query" inline size="default">
-        <el-form-item label="筛选范围">
-          <el-select v-model="query.courseId" placeholder="选择范围" style="width: 180px">
-            <el-option label="全校总榜 (全局)" value="0" />
+        <el-form-item label="所属学校">
+          <el-select v-model="query.schoolId" placeholder="全部学校" clearable style="width: 160px" @change="handleSchoolChange">
+            <el-option 
+              v-for="s in schoolList" 
+              :key="s.id" 
+              :label="s.schoolName" 
+              :value="s.id" 
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="学院">
+          <el-select 
+            v-model="query.department" 
+            placeholder="全部学院" 
+            clearable 
+            :disabled="!query.schoolId"
+            style="width: 160px" 
+            @change="handleDeptChange"
+          >
+            <el-option v-for="d in departmentOptions" :key="d" :label="d" :value="d" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="班级">
+          <el-select 
+            v-model="query.className" 
+            placeholder="全部班级" 
+            clearable 
+            :disabled="!query.department"
+            style="width: 140px"
+          >
+            <el-option v-for="c in classOptions" :key="c" :label="c" :value="c" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="课程范围">
+          <el-select v-model="query.courseId" placeholder="全部课程" style="width: 160px">
+            <el-option label="全站/全局" value="0" />
             <el-option 
               v-for="c in courseOptions" 
               :key="c.id" 
@@ -40,11 +73,11 @@
           </template>
         </el-table-column>
         
-        <el-table-column label="用户ID / 姓名" min-width="150">
+        <el-table-column label="用户 / 姓名" min-width="140">
           <template #default="{ row }">
-            <div class="user-info">
-              <span class="uid">#{{ row.userId }}</span>
-              <!-- 这里可以联查用户姓名，目前展示 ID -->
+            <div class="user-info-cell">
+              <span class="user-name">{{ userMap[row.userId]?.realName || '未知用户' }}</span>
+              <span class="user-id">#{{ row.userId }}</span>
             </div>
           </template>
         </el-table-column>
@@ -100,7 +133,7 @@
           layout="total, sizes, prev, pager, next, jumper"
           background
           @size-change="handleSearch"
-          @current-change="handleSearch"
+          @current-change="fetchList"
         />
       </div>
     </el-card>
@@ -112,6 +145,9 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Search, Refresh } from '@element-plus/icons-vue'
 import { getProfileList } from '@/api/report'
+import { getSchoolList, getDepartments, getClasses } from '@/api/school'
+import { getPublishedCourses } from '@/api/course'
+import { batchGetUsers } from '@/api/user'
 
 const router = useRouter()
 const loading = ref(false)
@@ -122,16 +158,32 @@ const courseOptions = ref<any[]>([]) // 可以从 api 获取已发布的课程�
 const query = reactive({
   current: 1,
   size: 10,
-  courseId: '0' // 默认全局榜单
+  courseId: '0',
+  schoolId: undefined as string | undefined,
+  department: undefined as string | undefined,
+  className: undefined as string | undefined
 })
+
+const schoolList = ref<any[]>([])
+const departmentOptions = ref<string[]>([])
+const classOptions = ref<string[]>([])
+const userMap = ref<Record<string, any>>({})
 
 // ───── 加载数据 ─────
 async function fetchList() {
   loading.value = true
   try {
     const res = await getProfileList(query)
-    tableData.value = res.list || res.records || []
+    const list = res.list || res.records || []
+    tableData.value = list
     total.value = res.total || 0
+    
+    // 批量获取用户名
+    if (list.length > 0) {
+      const uids = list.map((v: any) => v.userId)
+      const users = await batchGetUsers(uids)
+      userMap.value = { ...userMap.value, ...users }
+    }
   } finally {
     loading.value = false
   }
@@ -146,14 +198,56 @@ function handleReset() {
   query.current = 1
   query.size = 10
   query.courseId = '0'
+  query.schoolId = undefined
+  query.department = undefined
+  query.className = undefined
+  departmentOptions.value = []
+  classOptions.value = []
   fetchList()
 }
 
+// ───── 联动逻辑 ─────
+async function fetchSchools() {
+  const res = await getSchoolList({ pageNum: 1, pageSize: 100 })
+  schoolList.value = res.list || []
+}
+
+async function handleSchoolChange() {
+  query.department = undefined
+  query.className = undefined
+  departmentOptions.value = []
+  classOptions.value = []
+  if (query.schoolId) {
+    departmentOptions.value = await getDepartments(query.schoolId)
+  }
+}
+
+async function handleDeptChange() {
+  query.className = undefined
+  classOptions.value = []
+  if (query.schoolId && query.department) {
+    classOptions.value = await getClasses(query.schoolId, query.department)
+  }
+}
+
+async function fetchCourses() {
+  try {
+    const res = await getPublishedCourses()
+    courseOptions.value = res || []
+  } catch (e) {
+    console.error('加载课程列表失败', e)
+  }
+}
+
 function handleViewDetail(row: any) {
-  // 跳转到学生报告页面 (复用现有的详情组件，或新开管理员视图)
+  // 跳转到素养报告详情页 (ReportPage.vue 现已集成管理员看学生模式)
   router.push({
-    path: '/admin/student-literacy-detail',
-    query: { userId: row.userId, courseId: row.courseId }
+    path: '/report',
+    query: { 
+      userId: row.userId, 
+      courseId: row.courseId || '0',
+      userName: userMap.value[row.userId]?.realName || '学生'
+    }
   })
 }
 
@@ -170,7 +264,11 @@ function formatDateTime(time: string) {
   return time.replace('T', ' ').substring(0, 16)
 }
 
-onMounted(fetchList)
+onMounted(() => {
+  fetchList()
+  fetchSchools()
+  fetchCourses()
+})
 </script>
 
 <style scoped>
@@ -194,6 +292,10 @@ onMounted(fetchList)
 
 .score-text { font-weight: 700; color: #d32f2f; font-size: 15px; }
 .dim-score { color: #546e7a; font-size: 12px; }
+
+.user-info-cell { display: flex; flex-direction: column; }
+.user-name { font-weight: 600; color: #263238; font-size: 14px; }
+.user-id { font-size: 12px; color: #90a4ae; }
 
 .trend-text { font-size: 12px; font-weight: 600; }
 .trend-text.up { color: #43a047; }

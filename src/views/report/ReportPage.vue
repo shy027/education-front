@@ -2,19 +2,22 @@
   <div class="report-page">
 
     <!-- ===== 详情态 ===== -->
-    <div v-if="detailCourse || authStore.isStudent" class="detail-view">
+    <div v-if="detailCourse || authStore.isStudent || isManualView" class="detail-view">
       <div class="detail-header">
-        <el-button v-if="!authStore.isStudent" :icon="ArrowLeft" text @click="backToList">返回报告列表</el-button>
+        <el-button v-if="!authStore.isStudent && !isManualView" :icon="ArrowLeft" text @click="backToList">返回报告列表</el-button>
+        <el-button v-if="isManualView" :icon="ArrowLeft" text @click="$router.back()">返回列表</el-button>
         <div class="detail-header-info">
-          <h2 class="detail-title">{{ authStore.isStudent ? '个人综合素养全景' : detailCourse?.courseName }}</h2>
-          <p class="detail-desc">{{ authStore.isStudent ? '汇聚全平台学习数据的素养画像' : '课程报告管理' }}</p>
+          <h2 class="detail-title">
+            {{ isManualView ? `${targetUserName} 的素养报告` : (authStore.isStudent ? '个人综合素养全景' : detailCourse?.courseName) }}
+          </h2>
+          <p class="detail-desc">{{ (authStore.isStudent || isManualView) ? '汇聚全平台学习数据的素养画像' : '课程报告管理' }}</p>
         </div>
       </div>
 
       <div v-loading="detailLoading">
 
-        <!-- ===== 学生详情 ===== -->
-        <template v-if="authStore.isStudent">
+        <!-- ===== 学生详情 (或管理员看学生) ===== -->
+        <template v-if="authStore.isStudent || isManualView">
           <!-- 统计卡片 -->
           <div class="stat-cards">
             <div class="stat-card">
@@ -217,6 +220,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import { useAuthStore } from '@/stores/auth'
@@ -224,6 +228,7 @@ import { getMyCourses } from '@/api/course'
 import type { MyCourseItem } from '@/api/course'
 import {
   getMyProfile, getRadarData, getGrowthTrack, getLearningStatistics,
+  getUserProfile,
   calculateMyProfile, generateCourseReport, getCourseReportList,
   getReportDownloadUrl, getAllReportList,
 } from '@/api/report'
@@ -235,6 +240,7 @@ import {
 } from '@element-plus/icons-vue'
 
 const authStore = useAuthStore()
+const route = useRoute()
 const RADAR_COLORS = ['#d32f2f', '#f57c00', '#388e3c', '#1976d2', '#7b1fa2', '#673ab7']
 
 // ──── 列表数据 ────
@@ -243,6 +249,12 @@ const listLoading = ref(false)
 const profileMap = ref<Record<string, ProfileResponse>>({})
 const latestReportMap = ref<Record<string, ReportDTO>>({})
 const schoolReports = ref<ReportDTO[]>([])
+
+// ──── 管理员看学生模式 ────
+const isManualView = ref(false)
+const targetUserId = ref('')
+const targetCourseId = ref('0')
+const targetUserName = ref('学生')
 
 async function fetchListData() {
   listLoading.value = true
@@ -310,29 +322,33 @@ const dimensions = computed(() => {
 })
 
 function currentCourseId() {
-  if (authStore.isStudent) return '0' // 学生全局画像使用伪造全局 ID
+  if (authStore.isStudent || isManualView.value) return targetCourseId.value
   const c = detailCourse.value
   return c ? String(c.courseId ?? '') : ''
 }
 
-async function openDetailForStudent() {
+async function openDetailForStudent(userId?: string, courseId = '0') {
   detailLoading.value = true
+  isManualView.value = !!userId
+  targetUserId.value = userId || ''
+  targetCourseId.value = courseId
+  
   try {
-    const cid = '0'
+    const cid = courseId
     const [pRes, rRes, sRes] = await Promise.all([
-      getMyProfile(cid).catch(() => null),
-      getRadarData(cid).catch(() => null),
-      getLearningStatistics(cid).catch(() => null),
-      fetchGrowthTrack(),
+      userId ? getUserProfile(userId, cid).catch(() => null) : getMyProfile(cid).catch(() => null),
+      getRadarData(cid, userId).catch(() => null),
+      getLearningStatistics(cid, 30, userId).catch(() => null),
+      fetchGrowthTrack(userId),
     ])
     
     profile.value = pRes
     radarData.value = rRes
     stats.value = sRes
 
-    // 如果没有画像，尝试实时计算一次（仅在详情态触发）
+    // 如果是学生本人且没有画像，尝试实时计算一次
     const noProfile = !profile.value || (profile.value as any).exists === false
-    if (noProfile && !calculating.value) {
+    if (!userId && noProfile && !calculating.value) {
       doCalculate()
     }
     await nextTick()
@@ -418,7 +434,7 @@ const radarChartRef = ref<HTMLDivElement | null>(null)
 let radarChart: ECharts | null = null
 
 function initRadarChart() {
-  if (!radarChartRef.value || !authStore.isStudent || !dimensions.value.length) return
+  if (!radarChartRef.value || (!authStore.isStudent && !isManualView.value) || !dimensions.value.length) return
   if (!radarChart) radarChart = echarts.init(radarChartRef.value)
   radarChart.setOption({
     tooltip: {
@@ -459,9 +475,9 @@ const lineChartRef = ref<HTMLDivElement | null>(null)
 let lineChart: ECharts | null = null
 const growthData = ref<GrowthTrackResponse | null>(null)
 
-async function fetchGrowthTrack() {
+async function fetchGrowthTrack(userId?: string) {
   try {
-    const res = await getGrowthTrack(currentCourseId(), 30)
+    const res = await getGrowthTrack(currentCourseId(), 30, userId)
     growthData.value = res
     await nextTick(); initLineChart()
   } catch { /* 静默 */ }
@@ -490,7 +506,16 @@ function initLineChart() {
 
 function onResize() { radarChart?.resize(); lineChart?.resize() }
 
-onMounted(() => { fetchListData(); window.addEventListener('resize', onResize) })
+onMounted(async () => {
+  const { userId, courseId, userName } = route.query
+  if (userId) {
+    if (userName) targetUserName.value = String(userName)
+    await openDetailForStudent(String(userId), String(courseId || '0'))
+  } else {
+    fetchListData()
+  }
+  window.addEventListener('resize', onResize)
+})
 onUnmounted(() => {
   if (reportPollTimer) clearInterval(reportPollTimer)
   radarChart?.dispose(); lineChart?.dispose()

@@ -86,10 +86,13 @@ export interface UserManageItem {
   phone: string
   email: string
   avatar: string
-  roles: UserRole[]
+  roles: any[]
   status: number
   schoolId: string | null
   schoolName: string | null
+  department: string | null
+  className: string | null
+  studentNo: string | null
   createdAt: string
 }
 
@@ -100,6 +103,9 @@ export interface UserManageQuery extends PageQuery {
   phone?: string
   email?: string
   roleId?: string
+  schoolId?: string
+  department?: string
+  className?: string
   status?: number
 }
 

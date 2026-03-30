@@ -54,11 +54,21 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="query.status" placeholder="全部状态" clearable style="width: 110px">
-            <el-option label="启用" :value="1" />
-            <el-option label="禁用" :value="0" />
-          </el-select>
+        <el-form-item label="院系">
+          <el-input
+            v-model="query.department"
+            placeholder="所属院系"
+            clearable
+            style="width: 140px"
+          />
+        </el-form-item>
+        <el-form-item label="班级">
+          <el-input
+            v-model="query.className"
+            placeholder="所属班级"
+            clearable
+            style="width: 140px"
+          />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
@@ -121,6 +131,16 @@
           <template #default="{ row }">{{ row.schoolName || '—' }}</template>
         </el-table-column>
 
+        <el-table-column label="院系/班级" min-width="150" show-overflow-tooltip>
+          <template #default="{ row }">
+            <div v-if="row.department || row.className" class="school-info-cell">
+              <span v-if="row.department">{{ row.department }}</span>
+              <span v-if="row.className" class="class-tag">{{ row.className }}</span>
+            </div>
+            <span v-else>—</span>
+          </template>
+        </el-table-column>
+
         <el-table-column label="注册时间" width="150">
           <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
         </el-table-column>
@@ -170,7 +190,7 @@
           layout="total, sizes, prev, pager, next, jumper"
           background
           @size-change="handleSearch"
-          @current-change="handleSearch"
+          @current-change="fetchList"
         />
       </div>
     </el-card>
@@ -199,7 +219,10 @@
           <el-descriptions-item label="真实姓名">{{ drawerUser.realName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="手机号">{{ maskPhone(drawerUser.phone) }}</el-descriptions-item>
           <el-descriptions-item label="邮箱">{{ drawerUser.email || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="学号/工号">{{ drawerUser.studentNo || '—' }}</el-descriptions-item>
           <el-descriptions-item label="所属学校">{{ drawerUser.schoolName || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="院系部门">{{ drawerUser.department || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="所在班级">{{ drawerUser.className || '—' }}</el-descriptions-item>
           <el-descriptions-item label="账号状态">
             <el-tag :type="drawerUser.status === 1 ? 'success' : 'danger'" size="small">
               {{ drawerUser.status === 1 ? '正常' : '禁用' }}
@@ -306,6 +329,8 @@ function handleReset() {
     phone: '',
     roleId: undefined,
     status: undefined,
+    department: '',
+    className: '',
     pageNum: 1,
     pageSize: 10,
   })
@@ -411,6 +436,8 @@ async function handleExport() {
     if (query.phone) params.append('phone', query.phone)
     if (query.roleId) params.append('roleId', String(query.roleId))
     if (query.status !== undefined) params.append('status', String(query.status))
+    if (query.department) params.append('department', query.department)
+    if (query.className) params.append('className', query.className)
 
     const a = document.createElement('a')
     a.href = `/api/v1/users/manage/export?${params}`
@@ -472,6 +499,19 @@ onMounted(async () => {
 .contact-cell { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
 .email { color: #546e7a; }
 .none  { color: #b0bec5; }
+
+/* ===== 学校/院系/班级 ===== */
+.school-info-cell { display: flex; flex-direction: column; gap: 2px; }
+.class-tag {
+  display: inline-block;
+  padding: 0 6px;
+  background: #fdf2f2;
+  color: #d32f2f;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  width: fit-content;
+}
 
 /* ===== 角色标签 ===== */
 .role-tag { margin-right: 3px; }

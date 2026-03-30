@@ -144,6 +144,11 @@ export interface FileUploadResult {
 
 // ===================== 课程 CRUD =====================
 
+/** 获取已发布的课程列表 (用于下拉筛选) */
+export function getPublishedCourses() {
+  return get<CourseItem[]>('/v1/courses/published')
+}
+
 export const getCourseList = (params: CourseQuery) =>
   get<PageResponse<CourseItem>>('/v1/courses', params)
 

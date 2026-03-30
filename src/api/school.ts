@@ -8,7 +8,7 @@ import { get, post } from '@/utils/request'
 // ===================== 类型定义 =====================
 
 export interface SchoolItem {
-  schoolId: number | string   // 后端 Long，序列化为数字
+  id: number | string   // 后端 Long，与 SchoolResponse.id 匹配
   schoolCode?: string
   schoolName: string
   province?: string
@@ -44,3 +44,11 @@ export const getSchoolDetail = (schoolId: string) =>
 /** 申请加入学校（需登录） */
 export const joinSchool = (schoolId: string, data?: JoinSchoolRequest) =>
   post<void>(`/v1/schools/${schoolId}/join`, data ?? {})
+
+/** 获取学校下的院系列表 */
+export const getDepartments = (schoolId: string) =>
+  get<string[]>(`/v1/schools/${schoolId}/departments`)
+
+/** 获取学院下的班级列表 */
+export const getClasses = (schoolId: string, department: string) =>
+  get<string[]>(`/v1/schools/${schoolId}/classes`, { department })

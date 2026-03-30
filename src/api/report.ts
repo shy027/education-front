@@ -120,17 +120,22 @@ export const getMyProfile = (courseId: string) =>
 export const getUserProfile = (userId: string, courseId: string) =>
   silentGet<ProfileResponse>(`/v1/profiles/${userId}`, { courseId })
 
-export const getProfileList = (params: PageQuery & { courseId?: string }) =>
+export const getProfileList = (params: PageQuery & { 
+  courseId?: string; 
+  schoolId?: string; 
+  department?: string; 
+  className?: string; 
+}) =>
   get<PageResponse<ProfileResponse>>('/v1/profiles', params)
 
-export const getRadarData = (courseId: string) =>
-  silentGet<RadarDataResponse>('/v1/profiles/radar', { courseId })
+export const getRadarData = (courseId: string, userId?: string) =>
+  silentGet<RadarDataResponse>('/v1/profiles/radar', { courseId, userId })
 
-export const getGrowthTrack = (courseId: string, days = 30) =>
-  silentGet<GrowthTrackResponse>('/v1/profiles/growth-track', { courseId, days })
+export const getGrowthTrack = (courseId: string, days = 30, userId?: string) =>
+  silentGet<GrowthTrackResponse>('/v1/profiles/growth-track', { courseId, days, userId })
 
-export const getLearningStatistics = (courseId: string, days = 30) =>
-  silentGet<StatisticsResponse>('/v1/profiles/statistics', { courseId, days })
+export const getLearningStatistics = (courseId: string, days = 30, userId?: string) =>
+  silentGet<StatisticsResponse>('/v1/profiles/statistics', { courseId, days, userId })
 
 export const calculateMyProfile = (courseId: string) =>
   post<void>('/v1/profiles/calculate/user', null, { params: { courseId } })

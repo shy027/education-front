@@ -2,9 +2,10 @@
   <div class="student-literacy-list">
     <!-- 页头 -->
     <div class="page-header">
+      <el-button v-if="isCourseView" :icon="ArrowLeft" circle @click="router.back()" class="back-btn" />
       <div>
-        <h2 class="page-title">学生素养看板</h2>
-        <p class="page-desc">全校学生素养得分概览，支持按课程筛选及排名查看</p>
+        <h2 class="page-title">{{ isCourseView ? '课程学生素养详情' : '学生素养看板' }}</h2>
+        <p class="page-desc">{{ isCourseView ? '查看当前课程下所有学生的素养评分与各维度表现' : '全校学生素养得分概览，支持按课程筛选及排名查看' }}</p>
       </div>
     </div>
 
@@ -45,7 +46,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="课程范围">
-          <el-select v-model="query.courseId" placeholder="全部课程" style="width: 160px">
+          <el-select v-model="query.courseId" placeholder="全部课程" :disabled="isCourseView" style="width: 160px">
             <el-option label="全站/全局" value="0" />
             <el-option 
               v-for="c in courseOptions" 
@@ -142,14 +143,17 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { Search, Refresh } from '@element-plus/icons-vue'
+import { useRouter, useRoute } from 'vue-router'
+import { Search, Refresh, ArrowLeft } from '@element-plus/icons-vue'
+import { computed } from 'vue'
 import { getProfileList } from '@/api/report'
 import { getSchoolList, getDepartments, getClasses } from '@/api/school'
 import { getPublishedCourses } from '@/api/course'
 import { batchGetUsers } from '@/api/user'
 
 const router = useRouter()
+const route = useRoute()
+const isCourseView = computed(() => !!route.query.courseId)
 const loading = ref(false)
 const tableData = ref<any[]>([])
 const total = ref(0)
@@ -265,6 +269,9 @@ function formatDateTime(time: string) {
 }
 
 onMounted(() => {
+  if (route.query.courseId) {
+    query.courseId = String(route.query.courseId)
+  }
   fetchList()
   fetchSchools()
   fetchCourses()
@@ -273,7 +280,8 @@ onMounted(() => {
 
 <style scoped>
 .student-literacy-list { padding: 4px; }
-.page-header { margin-bottom: 20px; }
+.page-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+.back-btn { font-size: 18px; }
 .page-title { margin: 0 0 4px; font-size: 20px; font-weight: 700; color: #d32f2f; }
 .page-desc  { margin: 0; font-size: 13px; color: #78909c; }
 

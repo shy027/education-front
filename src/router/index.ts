@@ -127,6 +127,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/report/ReportPage.vue'),
         meta: { title: '素养报告', icon: 'DataLine' },
       },
+      {
+        path: 'report/student-literacy',
+        name: 'CourseStudentLiteracy',
+        component: () => import('@/views/admin/StudentLiteracyList.vue'),
+        meta: { title: '学生素养看板', hideInMenu: true, roles: ['ADMIN', 'SCHOOL_LEADER', 'TEACHER'] },
+      },
 
       // 个人中心
       {

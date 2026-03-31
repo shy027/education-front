@@ -81,9 +81,12 @@
           <div class="section-card">
             <div class="card-header">
               <h3>课程报告列表</h3>
-              <el-button type="primary" class="red-btn" :loading="generating" @click="handleGenerateReport">
-                生成报告
-              </el-button>
+               <el-button type="primary" class="red-btn" :loading="generating" @click="handleGenerateReport">
+                 生成报告
+               </el-button>
+               <el-button type="warning" class="orange-btn" @click="handleViewStudentLiteracy">
+                 查看学生素养
+               </el-button>
             </div>
             <el-empty v-if="!reports.length" description="暂无报告" :image-size="80" />
             <el-table v-else :data="reports" stripe style="width:100%">
@@ -220,7 +223,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import type { ECharts } from 'echarts'
 import { useAuthStore } from '@/stores/auth'
@@ -241,6 +244,7 @@ import {
 
 const authStore = useAuthStore()
 const route = useRoute()
+const router = useRouter()
 const RADAR_COLORS = ['#d32f2f', '#f57c00', '#388e3c', '#1976d2', '#7b1fa2', '#673ab7']
 
 // ──── 列表数据 ────
@@ -404,6 +408,13 @@ async function handleGenerateReport() {
       if (!reports.value.some(r => r.status === 1)) clearInterval(reportPollTimer!)
     }, 3000)
   } finally { generating.value = false }
+}
+
+function handleViewStudentLiteracy() {
+  router.push({
+    path: '/report/student-literacy',
+    query: { courseId: currentCourseId() }
+  })
 }
 
 async function handleDownloadReport(id: string | number) {
@@ -649,4 +660,6 @@ onUnmounted(() => {
   .section-row { grid-template-columns: 1fr; }
   .course-report-grid { grid-template-columns: 1fr; }
 }
+.orange-btn { background-color: #f57c00 !important; border-color: #f57c00 !important; margin-left: 10px; }
+.orange-btn:hover { opacity: 0.9; }
 </style>

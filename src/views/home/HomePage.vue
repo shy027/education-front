@@ -14,19 +14,6 @@
       </div>
     </div>
 
-    <!-- 统计卡片 -->
-    <div class="stat-cards">
-      <div v-for="s in statItems" :key="s.label" class="stat-card">
-        <div class="stat-icon" :style="{ background: s.bg }">
-          <el-icon :size="22" :color="s.color"><component :is="s.icon" /></el-icon>
-        </div>
-        <div class="stat-info">
-          <div class="stat-num">{{ s.value }}</div>
-          <div class="stat-label">{{ s.label }}</div>
-        </div>
-      </div>
-    </div>
-
     <!-- 主要内容区 -->
     <div class="home-grid">
       <!-- 我的课程 -->
@@ -78,25 +65,54 @@
         </div>
       </div>
 
-      <!-- 右侧：最新动态 -->
-      <div class="home-section notice-section">
+      <!-- 最新资源 -->
+      <div class="home-section resource-section">
         <div class="section-header">
-          <h3><el-icon><Bell /></el-icon> 最新动态</h3>
+          <h3>
+            <el-icon><Collection /></el-icon>
+            最新资源
+          </h3>
+          <el-button text type="primary" @click="$router.push('/resource')">查看全部</el-button>
         </div>
-        <div class="notice-list">
-          <div v-for="n in notices" :key="n.id" class="notice-item">
-            <div class="notice-dot" :class="n.type" />
-            <div class="notice-body">
-              <div class="notice-text">{{ n.text }}</div>
-              <div class="notice-time">{{ n.time }}</div>
+
+        <div v-if="resLoading" class="loading-placeholder">
+          <el-skeleton :rows="3" animated />
+        </div>
+
+        <el-empty v-else-if="!latestResources.length" description="暂无资源，去资源中心看看吧" :image-size="80">
+          <el-button type="primary" @click="$router.push('/resource')">浏览资源</el-button>
+        </el-empty>
+
+        <div v-else class="resource-list">
+          <div
+            v-for="r in latestResources"
+            :key="r.id"
+            class="resource-item"
+            @click="$router.push(`/resource/detail/${r.id}`)"
+          >
+            <div class="resource-cover">
+              <img v-if="r.coverUrl" :src="r.coverUrl" :alt="r.title" />
+              <div v-else class="cover-placeholder">
+                <el-icon :size="28" color="#fff"><component :is="getResourceIcon(r.resourceType)" /></el-icon>
+              </div>
             </div>
-          </div>
-          <div v-if="!notices.length" class="notice-empty">
-            <el-icon><InfoFilled /></el-icon> 暂无最新动态
+            <div class="resource-info">
+              <div class="resource-title">{{ r.title }}</div>
+              <div class="resource-meta">
+                <span>{{ r.creatorName }}</span>
+                <span class="dot">•</span>
+                <span>{{ formatDate(r.createdTime) }}</span>
+              </div>
+              <div class="resource-stats">
+                <el-icon><View /></el-icon>
+                {{ r.viewCount || 0 }} 次查看
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
+
   </div>
 </template>
 
@@ -105,9 +121,11 @@ import { ref, computed, markRaw, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { getMyCourses } from '@/api/course'
 import type { MyCourseItem } from '@/api/course'
+import { getResourceList } from '@/api/resource'
+import type { ResourceItem } from '@/api/resource'
 import {
-  Reading, UserFilled, Bell, InfoFilled,
-  Collection, Comment, DataAnalysis, Trophy,
+  Reading, UserFilled, Collection, VideoCamera, Document, Microphone,
+  View,
 } from '@element-plus/icons-vue'
 import { ROLE_LABEL } from '@/constants'
 
@@ -140,9 +158,9 @@ async function fetchMyCourses() {
     const res = await getMyCourses()
     // 后端返回字段名称： teaching/learning/assisting
     if (authStore.isTeacher) {
-      myCourses.value = [...(res.teaching ?? []), ...(res.assisting ?? [])].slice(0, 6)
+      myCourses.value = [...(res.teaching ?? []), ...(res.assisting ?? [])].slice(0, 4)
     } else {
-      myCourses.value = (res.learning ?? []).slice(0, 6)
+      myCourses.value = (res.learning ?? []).slice(0, 4)
     }
   } catch {
     myCourses.value = []
@@ -159,28 +177,44 @@ function courseStatusLabel(status: number): string {
   return ({ 0: '暂未开放', 1: '进行中', 2: '已结课' } as Record<number, string>)[status] ?? '未知'
 }
 
-// ───── 统计卡片 ─────
-const statItems = computed(() => {
-  if (authStore.isTeacher) {
-    return [
-      { label: '教授课程', value: myCourses.value.length, icon: markRaw(Reading), color: '#d32f2f', bg: '#ffebee' },
-      { label: '课程研讨', value: '—', icon: markRaw(Comment), color: '#1976d2', bg: '#e3f2fd' },
-      { label: '发布资源', value: '—', icon: markRaw(Collection), color: '#388e3c', bg: '#e8f5e9' },
-      { label: '平台评分', value: '—', icon: markRaw(Trophy), color: '#f57c00', bg: '#fff3e0' },
-    ]
+// ───── 资源展示 ─────
+const resLoading = ref(false)
+const latestResources = ref<ResourceItem[]>([])
+
+async function fetchLatestResources() {
+  resLoading.value = true
+  try {
+    const res = await getResourceList({
+      status: 2, // 已发布
+      pageSize: 4,
+      pageNum: 1
+    })
+    latestResources.value = res.list || []
+  } catch {
+    latestResources.value = []
+  } finally {
+    resLoading.value = false
   }
-  return [
-    { label: '参与课程', value: myCourses.value.length, icon: markRaw(Reading), color: '#d32f2f', bg: '#ffebee' },
-    { label: '完成任务', value: '—', icon: markRaw(DataAnalysis), color: '#388e3c', bg: '#e8f5e9' },
-    { label: '参与研讨', value: '—', icon: markRaw(Comment), color: '#1976d2', bg: '#e3f2fd' },
-    { label: '素养得分', value: '—', icon: markRaw(Trophy), color: '#f57c00', bg: '#fff3e0' },
-  ]
+}
+
+function getResourceIcon(type: number) {
+  return {
+    1: markRaw(Document),
+    2: markRaw(VideoCamera),
+    3: markRaw(Document),
+    4: markRaw(Microphone),
+  }[type] || markRaw(Collection)
+}
+
+function formatDate(timeStr?: string) {
+  if (!timeStr) return '-'
+  return new Date(timeStr).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
+}
+
+onMounted(() => {
+  fetchMyCourses()
+  fetchLatestResources()
 })
-
-// ───── 最新动态（静态示例，后期可扩展 websocket） ─────
-const notices = ref<{ id: number; type: string; text: string; time: string }[]>([])
-
-onMounted(fetchMyCourses)
 </script>
 
 <style scoped>
@@ -203,12 +237,7 @@ onMounted(fetchMyCourses)
 
 .banner-role-tag { background: rgba(255,255,255,0.25) !important; color: #fff !important; border: none !important; }
 
-/* ===== 统计卡片 ===== */
-.stat-cards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-}
+/* ===== 统计卡片 (已隐藏) ===== */
 
 .stat-card {
   background: #fff;
@@ -237,10 +266,9 @@ onMounted(fetchMyCourses)
 
 /* ===== 主内容区 ===== */
 .home-grid {
-  display: grid;
-  grid-template-columns: 1fr 280px;
-  gap: 16px;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .home-section {
@@ -263,14 +291,18 @@ onMounted(fetchMyCourses)
 .section-header .el-icon { color: #d32f2f; }
 
 /* ===== 课程列表 ===== */
-.course-list { display: flex; flex-direction: column; gap: 12px; }
+.course-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
 
 .course-item {
   display: flex;
-  gap: 14px;
+  gap: 16px;
   align-items: center;
-  padding: 12px;
-  border-radius: 10px;
+  padding: 16px;
+  border-radius: 12px;
   cursor: pointer;
   transition: background 0.2s;
   border: 1px solid #f5f5f5;
@@ -278,8 +310,8 @@ onMounted(fetchMyCourses)
 .course-item:hover { background: #fff8f8; border-color: #ffcdd2; }
 
 .course-cover {
-  width: 72px;
-  height: 54px;
+  width: 96px;
+  height: 72px;
   border-radius: 8px;
   overflow: hidden;
   flex-shrink: 0;
@@ -288,25 +320,44 @@ onMounted(fetchMyCourses)
 .course-cover img { width: 100%; height: 100%; object-fit: cover; }
 .cover-placeholder { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
 
-.course-name { font-size: 14px; font-weight: 600; color: #263238; margin-bottom: 4px; }
-.course-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 12px; color: #78909c; }
-.course-members { font-size: 12px; color: #90a4ae; display: flex; align-items: center; gap: 4px; }
+.course-name { font-size: 16px; font-weight: 700; color: #263238; margin-bottom: 6px; }
+.course-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 13px; color: #78909c; }
+.course-members { font-size: 13px; color: #90a4ae; display: flex; align-items: center; gap: 4px; }
 
-/* ===== 动态 ===== */
-.notice-list { display: flex; flex-direction: column; gap: 12px; }
-
-.notice-item { display: flex; gap: 10px; align-items: flex-start; }
-
-.notice-dot {
-  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px;
+/* ===== 资源列表 ===== */
+.resource-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
 }
-.notice-dot.course  { background: #d32f2f; }
-.notice-dot.task    { background: #1976d2; }
-.notice-dot.system  { background: #78909c; }
 
-.notice-text { font-size: 13px; color: #37474f; line-height: 1.5; }
-.notice-time { font-size: 11px; color: #90a4ae; margin-top: 2px; }
-.notice-empty { font-size: 13px; color: #b0bec5; display: flex; align-items: center; gap: 6px; }
+.resource-item {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+  border: 1px solid #f5f5f5;
+}
+.resource-item:hover { background: #f8fbff; border-color: #bbdefb; }
+
+.resource-cover {
+  width: 96px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, #1976d2, #42a5f5);
+}
+.resource-cover img { width: 100%; height: 100%; object-fit: cover; }
+
+.resource-title { font-size: 16px; font-weight: 700; color: #263238; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
+.resource-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: 13px; color: #78909c; }
+.resource-meta .dot { font-weight: bold; }
+.resource-stats { font-size: 13px; color: #90a4ae; display: flex; align-items: center; gap: 4px; }
+
 
 .loading-placeholder { padding: 12px 0; }
 

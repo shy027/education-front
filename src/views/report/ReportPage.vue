@@ -112,6 +112,19 @@
                 </template>
               </el-table-column>
             </el-table>
+            <!-- 分页 -->
+            <div v-if="reportTotal > 0" class="pagination-wrap">
+              <el-pagination
+                v-model:current-page="reportQuery.pageNum"
+                v-model:page-size="reportQuery.pageSize"
+                :total="reportTotal"
+                :page-sizes="[10, 20, 50]"
+                layout="total, sizes, prev, pager, next"
+                background
+                size="small"
+                @change="fetchReports"
+              />
+            </div>
           </div>
         </template>
 
@@ -152,7 +165,7 @@
             </div>
             <div class="course-report-grid">
               <div
-                v-for="c in myCourseOptions"
+                v-for="c in pagedCourses"
                 :key="c.courseId"
                 class="course-report-card"
                 @click="openDetail(c)"
@@ -186,6 +199,18 @@
                 <div class="crc-arrow"><el-icon><ArrowRight /></el-icon></div>
               </div>
             </div>
+            <!-- 分页 -->
+            <div v-if="myCourseOptions.length > coursePageSize" class="pagination-wrap">
+              <el-pagination
+                v-model:current-page="coursePageNum"
+                v-model:page-size="coursePageSize"
+                :total="myCourseOptions.length"
+                :page-sizes="[8, 12, 24, 48]"
+                layout="total, sizes, prev, pager, next"
+                background
+                @change="onCoursePageChange"
+              />
+            </div>
           </div>
 
           <!-- 校领导额外：学校报告区块 -->
@@ -213,6 +238,19 @@
                 </template>
               </el-table-column>
             </el-table>
+            <!-- 分页 -->
+            <div v-if="schoolReportTotal > 0" class="pagination-wrap">
+              <el-pagination
+                v-model:current-page="schoolReportQuery.pageNum"
+                v-model:page-size="schoolReportQuery.pageSize"
+                :total="schoolReportTotal"
+                :page-sizes="[10, 20, 50]"
+                layout="total, sizes, prev, pager, next"
+                background
+                size="small"
+                @change="fetchSchoolReports"
+              />
+            </div>
           </div>
         </template>
       </div>
@@ -254,6 +292,29 @@ const profileMap = ref<Record<string, ProfileResponse>>({})
 const latestReportMap = ref<Record<string, ReportDTO>>({})
 const schoolReports = ref<ReportDTO[]>([])
 
+// 课程卡片分页 (前端分页)
+const coursePageNum = ref(1)
+const coursePageSize = ref(8)
+const pagedCourses = computed(() => {
+  const start = (coursePageNum.value - 1) * coursePageSize.value
+  return myCourseOptions.value.slice(start, start + coursePageSize.value)
+})
+function onCoursePageChange() {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+// 学校报告分页 (后端分页)
+const schoolReportTotal = ref(0)
+const schoolReportQuery = reactive({ pageNum: 1, pageSize: 10 })
+async function fetchSchoolReports() {
+  if (!authStore.isSchoolLeader) return
+  try {
+    const res = await getAllReportList({ reportType: 2, ...schoolReportQuery })
+    schoolReports.value = res?.list || res?.records || []
+    schoolReportTotal.value = res?.total || 0
+  } catch { /* 静默 */ }
+}
+
 // ──── 管理员看学生模式 ────
 const isManualView = ref(false)
 const targetUserId = ref('')
@@ -266,7 +327,14 @@ async function fetchListData() {
     
     // 加载课程列表
     const res = await getMyCourses()
-    myCourseOptions.value = authStore.isStudent ? (res.learning ?? []) : (res.teaching ?? [])
+    const allCourses = authStore.isStudent ? (res.learning ?? []) : (res.teaching ?? [])
+    
+    // 教师端/校领导：仅显示审核通过（auditStatus === 1）的课程
+    if (!authStore.isStudent) {
+      myCourseOptions.value = allCourses.filter(c => c.auditStatus === 1)
+    } else {
+      myCourseOptions.value = allCourses
+    }
 
     if (authStore.isStudent) {
       await openDetailForStudent()
@@ -278,10 +346,7 @@ async function fetchListData() {
 
     // 校领导：加载学校报告
     if (authStore.isSchoolLeader) {
-      try {
-        const sr = await getAllReportList({ reportType: 2, pageNum: 1, pageSize: 50 })
-        schoolReports.value = sr?.list || sr?.records || []
-      } catch { /* 静默 */ }
+      await fetchSchoolReports()
     }
   } finally {
     listLoading.value = false
@@ -307,6 +372,8 @@ const detailLoading = ref(false)
 const profile = ref<ProfileResponse | null>(null)
 const stats = ref<StatisticsResponse | null>(null)
 const reports = ref<ReportDTO[]>([])
+const reportTotal = ref(0)
+const reportQuery = reactive({ pageNum: 1, pageSize: 10 })
 const calculating = ref(false)
 const generating = ref(false)
 let reportPollTimer: number | null = null
@@ -376,13 +443,16 @@ async function openDetail(c: MyCourseItem) {
 function backToList() {
   detailCourse.value = null
   profile.value = null; stats.value = null; reports.value = []
+  reportTotal.value = 0
+  reportQuery.pageNum = 1
   if (reportPollTimer) clearInterval(reportPollTimer)
 }
 
 async function fetchReports() {
   try {
-    const res = await getCourseReportList(currentCourseId(), { pageNum: 1, pageSize: 20 })
-    reports.value = res?.list ?? []
+    const res = await getCourseReportList(currentCourseId(), { ...reportQuery })
+    reports.value = res?.list ?? res?.records ?? []
+    reportTotal.value = res?.total ?? 0
   } catch { /* 静默 */ }
 }
 

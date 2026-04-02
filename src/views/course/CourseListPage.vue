@@ -68,6 +68,11 @@
             <el-option label="暂未开放" :value="0" />
             <el-option label="进行中" :value="1" />
             <el-option v-if="activeTab === 'mine'" label="已结课" :value="2" />
+            <!-- 新增：教师特有的审核状态筛选（仅在“我教的课程”模式下显示） -->
+            <template v-if="activeTab === 'mine' && authStore.isTeacher">
+              <el-option label="草稿" :value="-1" />
+              <el-option label="审核中" :value="-2" />
+            </template>
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -128,6 +133,7 @@
               加入课程
             </el-button>
           </div>
+          <!-- 教师端：已移除查看报告按钮 -->
         </div>
       </div>
 
@@ -140,10 +146,11 @@
         v-model:current-page="query.pageNum"
         v-model:page-size="query.pageSize"
         :total="total"
-        :page-sizes="[12, 24, 48]"
+        :page-sizes="[12, 24, 48, 96]"
         layout="total, sizes, prev, pager, next"
         background
-        @change="fetchList"
+        @size-change="handleSearch"
+        @current-change="fetchList"
       />
     </div>
 
@@ -155,7 +162,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { Plus, Search, Reading, User, UserFilled } from '@element-plus/icons-vue'
+import { Plus, Search, Reading, User, UserFilled, DataAnalysis } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { getCourseList, getMyCourses, joinCourse, createCourse } from '@/api/course'
 import type { CourseItem, CourseCreateReq } from '@/api/course'
@@ -176,7 +183,7 @@ const query = reactive({
   keyword: '',
   subjectArea: '' as string | undefined,
   joinType: undefined as number | undefined,
-  status: undefined as number | undefined, // 默认显示不限
+  status: 1 as number | undefined, // 默认显示进行中
   pageNum: 1,
   pageSize: 12,
 })
@@ -250,8 +257,17 @@ async function fetchList() {
         filteredList = filteredList.filter((c) => c.subjectArea === query.subjectArea)
       }
       if (query.status !== undefined && query.status !== null && query.status !== '' as any) {
-        const statusMap = { 0: 'notStarted', 1: 'ongoing', 2: 'finished' } as Record<number, string>
-        filteredList = filteredList.filter((c) => getCalculatedStatus(c) === statusMap[query.status as number])
+        if (query.status === -1) {
+          // 草稿
+          filteredList = filteredList.filter((c) => c.auditStatus === -1)
+        } else if (query.status === -2) {
+          // 审核中
+          filteredList = filteredList.filter((c) => c.auditStatus === 0)
+        } else {
+          // 正常的时段状态 (进行的/未开放的/已结课的)
+          const statusMap = { 0: 'notStarted', 1: 'ongoing', 2: 'finished' } as Record<number, string>
+          filteredList = filteredList.filter((c) => getCalculatedStatus(c) === statusMap[query.status as number])
+        }
       }
       
       // 排序优先级: 草稿(-1)、审核中(0) 优先，其余按创建时间倒序
@@ -280,13 +296,23 @@ async function fetchList() {
         ...query,
         subjectArea: query.subjectArea || undefined,
         joinType: query.joinType,
-        status: query.status,
+        status: query.status !== undefined ? query.status : 1, // 全部课程默认显示“进行中”(1)
       })
       let list = res.list || res.records || []
-      // 需求：对全部课程的显示进行修改，不显示已结课的课程
-      list = list.filter((c) => getCalculatedStatus(c) !== 'finished')
-      courseList.value = list
-      total.value = res.total
+      
+      //需求：不显示已结课的课程。如果后端返回了已结课的（例如判定标准不一），前端二次过滤
+      const filtered = list.filter((c) => getCalculatedStatus(c) !== 'finished')
+      courseList.value = filtered
+      
+      // 修正总数显示：如果后端返回的总数很大，但经过前端过滤后本页变少了，
+      // 我们至少保证 total 不会引导用户翻到完全空的后几页（虽然这只是权宜之计）
+      if (list.length > filtered.length) {
+        // 如果本页有被过滤掉的，说明 total 统计了已结课的，这里做一个近似偏移
+        const loss = list.length - filtered.length
+        total.value = Math.max(0, res.total - loss)
+      } else {
+        total.value = res.total
+      }
     }
   } finally {
     loading.value = false
@@ -307,6 +333,10 @@ function handleReset() {
 function switchTab(tab: 'all' | 'mine') {
   activeTab.value = tab
   query.pageNum = 1
+  // 切换到全部课程时，如果没有手动选状态，默认设为1（进行中）
+  if (tab === 'all' && query.status === undefined) {
+    query.status = 1
+  }
   fetchList()
 }
 

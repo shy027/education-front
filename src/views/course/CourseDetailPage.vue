@@ -65,6 +65,13 @@
               :icon="Edit"
             >审核中 (基础信息已锁定)</el-button>
             <!-- 审核通过状态：编辑按钮消失 (符合需求: 审核通过一行的四个按钮全部消失) -->
+            <!-- 需求：增加查看报告按钮，仅限本人且审核通过 -->
+            <el-button
+              v-if="course.auditStatus === 1"
+              type="info"
+              :icon="DataAnalysis"
+              @click="$router.push({ path: '/report', query: { courseId: course.id } })"
+            >查看教学报告</el-button>
           </template>
         </div>
       </div>

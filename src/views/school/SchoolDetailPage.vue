@@ -151,7 +151,7 @@ async function fetchDetail() {
 /** 是否已加入该学校（统一转字符串比较） */
 const isJoined = computed(() =>
   !!authStore.userInfo?.schoolId &&
-  String(authStore.userInfo.schoolId) === String(school.value?.schoolId)
+  String(authStore.userInfo.schoolId) === String(school.value?.id)
 )
 
 /** 仅教师且无学校时可申请 */
@@ -175,7 +175,7 @@ async function handleJoin() {
   if (!school.value) return
   joining.value = true
   try {
-    await joinSchool(String(school.value.schoolId), {
+    await joinSchool(String(school.value.id), {
       inviteCode: inviteCode.value || undefined,
     })
     ElMessage.success(`成功加入 ${school.value.schoolName}！`)

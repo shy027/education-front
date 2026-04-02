@@ -70,7 +70,7 @@
 
       <div
         v-for="school in schools"
-        :key="school.schoolId"
+        :key="school.id"
         class="school-card"
         @click="goDetail(school)"
       >
@@ -116,12 +116,14 @@
     <!-- 分页 -->
     <div class="pagination-wrap">
       <el-pagination
-        v-if="total > pageSize"
+        v-if="total > 0"
         v-model:current-page="pageNum"
-        :page-size="pageSize"
+        v-model:page-size="pageSize"
         :total="total"
-        layout="total, prev, pager, next"
+        :page-sizes="[12, 24, 48, 60]"
+        layout="total, sizes, prev, pager, next"
         background
+        @size-change="handleSearch"
         @current-change="fetchSchools"
       />
     </div>
@@ -143,7 +145,7 @@ const router = useRouter()
 const keyword  = ref('')
 const province = ref('')
 const pageNum  = ref(1)
-const pageSize = 12
+const pageSize = ref(12)
 
 // ───── 数据 ─────
 const loading = ref(false)
@@ -152,8 +154,7 @@ const total   = ref(0)
 
 /** 是否是当前用户所属学校（统一转字符串比较，兼容 Long 与 string） */
 function isMySchool(school: SchoolItem): boolean {
-  if (!authStore.userInfo?.schoolId) return false
-  return String(authStore.userInfo.schoolId) === String(school.schoolId)
+  return !!authStore.userInfo?.schoolId && String(authStore.userInfo.schoolId) === String(school.id)
 }
 
 /**
@@ -176,7 +177,7 @@ async function fetchSchools() {
       const res = await getSchoolList({
         keyword: keyword.value || undefined,
         pageNum: pageNum.value,
-        pageSize,
+        pageSize: pageSize.value,
       })
       schools.value = res?.list ?? []
       total.value = res?.total ?? 0
@@ -188,7 +189,7 @@ async function fetchSchools() {
         keyword: keyword.value || undefined,
         province: p,
         pageNum: pageNum.value,
-        pageSize,
+        pageSize: pageSize.value,
       })
       if ((res?.list?.length ?? 0) > 0) {
         schools.value = res.list
@@ -216,7 +217,8 @@ function resetSearch() {
 }
 
 function goDetail(school: SchoolItem) {
-  router.push(`/schools/${school.schoolId}`)
+  // 核心修复：SchoolItem 中字段名为 id，而非 schoolId
+  router.push(`/schools/${school.id}`)
 }
 
 onMounted(fetchSchools)

@@ -169,14 +169,14 @@
       <!-- 分页 -->
       <div class="pagination-wrap">
         <el-pagination
-          v-if="total > query.pageSize!"
           v-model:current-page="query.pageNum"
           v-model:page-size="query.pageSize"
           :total="total"
-          :page-sizes="[16, 32, 48]"
+          :page-sizes="[16, 32, 48, 64]"
           layout="total, sizes, prev, pager, next"
           background
-          @change="fetchResources"
+          @size-change="handleSearch"
+          @current-change="fetchResources"
         />
       </div>
     </div>

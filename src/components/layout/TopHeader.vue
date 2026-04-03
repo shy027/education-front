@@ -83,7 +83,7 @@ async function handleCommand(cmd: string) {
   if (cmd === 'profile') {
     router.push('/profile')
   } else if (cmd === 'admin') {
-    router.push('/admin/dashboard')
+    router.push('/admin')
   } else if (cmd === 'logout') {
     const confirm = await ElMessageBox.confirm('确定要退出登录吗？', '提示', {
       type: 'warning',

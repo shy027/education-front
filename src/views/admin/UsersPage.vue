@@ -70,6 +70,16 @@
             style="width: 140px"
           />
         </el-form-item>
+        <el-form-item v-if="authStore.isAdmin" label="学校">
+          <el-select v-model="query.schoolId" placeholder="全部学校" clearable style="width: 150px">
+            <el-option
+              v-for="s in schoolList"
+              :key="s.id"
+              :label="s.schoolName"
+              :value="s.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" :icon="Search" @click="handleSearch">搜索</el-button>
           <el-button :icon="Refresh" @click="handleReset">重置</el-button>
@@ -107,12 +117,12 @@
           <template #default="{ row }">
             <el-tag
               v-for="role in row.roles"
-              :key="role"
+              :key="role.roleId"
               size="small"
-              :type="roleTagType(role)"
+              :type="roleTagType(role.roleCode)"
               class="role-tag"
             >
-              {{ ROLE_LABEL[role] ?? role }}
+              {{ role.roleName }}
             </el-tag>
           </template>
         </el-table-column>
@@ -120,14 +130,14 @@
         <el-table-column label="联系方式" min-width="160">
           <template #default="{ row }">
             <div class="contact-cell">
-              <span v-if="row.phone">📱 {{ maskPhone(row.phone) }}</span>
+              <span v-if="row.phone">📱 {{ row.phone }}</span>
               <span v-if="row.email" class="email">✉ {{ row.email }}</span>
               <span v-if="!row.phone && !row.email" class="none">—</span>
             </div>
           </template>
         </el-table-column>
 
-        <el-table-column label="所属学校" prop="schoolName" min-width="130" show-overflow-tooltip>
+        <el-table-column v-if="authStore.isAdmin" label="所属学校" prop="schoolName" min-width="130" show-overflow-tooltip>
           <template #default="{ row }">{{ row.schoolName || '—' }}</template>
         </el-table-column>
 
@@ -142,7 +152,7 @@
         </el-table-column>
 
         <el-table-column label="注册时间" width="150">
-          <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
+          <template #default="{ row }">{{ formatDate(row.createdTime) }}</template>
         </el-table-column>
 
         <el-table-column label="状态" width="90" align="center">
@@ -258,8 +268,12 @@ import {
   getUserList, getUserDetail, updateUserStatus,
   resetUserPassword, importUsers, getAllRoles,
 } from '@/api/user'
+import { getSchoolList } from '@/api/school'
 import { ROLE_LABEL } from '@/constants'
+import { useAuthStore } from '@/stores/auth'
 import type { UserManageItem, UserManageQuery } from '@/types/user'
+
+const authStore = useAuthStore()
 
 // ───── 状态 ─────
 const loading = ref(false)
@@ -268,6 +282,7 @@ const exportLoading = ref(false)
 const tableData = ref<(UserManageItem & { _toggling?: boolean })[]>([])
 const total = ref(0)
 const allRoles = ref<{ id: string; roleName: string; roleCode: string }[]>([])
+const schoolList = ref<any[]>([])
 
 // ───── 查询参数 ─────
 const query = reactive<UserManageQuery>({
@@ -296,11 +311,6 @@ function roleTagType(role?: string): 'primary' | 'success' | 'warning' | 'info' 
 }
 
 // ───── 工具函数 ─────
-function maskPhone(phone?: string): string {
-  if (!phone) return '—'
-  return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
-}
-
 function formatDate(dateStr?: string): string {
   if (!dateStr) return '—'
   return dateStr.slice(0, 10)
@@ -310,6 +320,10 @@ function formatDate(dateStr?: string): string {
 async function fetchList() {
   loading.value = true
   try {
+    // 自动带入校领导的学校ID实现数据隔离
+    if (authStore.isSchoolLeader && authStore.userInfo?.schoolId) {
+      query.schoolId = String(authStore.userInfo.schoolId)
+    }
     const res = await getUserList(query)
     tableData.value = res?.list || []
     total.value = res?.total ?? 0
@@ -331,6 +345,7 @@ function handleReset() {
     status: undefined,
     department: '',
     className: '',
+    schoolId: authStore.isSchoolLeader ? String(authStore.userInfo?.schoolId) : undefined,
     pageNum: 1,
     pageSize: 10,
   })
@@ -438,6 +453,10 @@ async function handleExport() {
     if (query.status !== undefined) params.append('status', String(query.status))
     if (query.department) params.append('department', query.department)
     if (query.className) params.append('className', query.className)
+    // 导出也要带上学校过滤
+    if (authStore.isSchoolLeader && authStore.userInfo?.schoolId) {
+      params.append('schoolId', String(authStore.userInfo.schoolId))
+    }
 
     const a = document.createElement('a')
     a.href = `/api/v1/users/manage/export?${params}`
@@ -452,9 +471,15 @@ async function handleExport() {
 }
 
 // ───── 初始化 ─────
+async function fetchSchools() {
+  if (!authStore.isAdmin) return
+  const res = await getSchoolList({ pageNum: 1, pageSize: 1000 })
+  schoolList.value = res.list || []
+}
+
 onMounted(async () => {
-  // 并行加载：用户列表 + 所有角色
-  const [, roles] = await Promise.all([fetchList(), getAllRoles()])
+  // 并行加载：用户列表 + 所有角色 + 学校列表
+  const [, roles] = await Promise.all([fetchList(), getAllRoles(), fetchSchools()])
   allRoles.value = roles
 })
 </script>

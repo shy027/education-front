@@ -181,6 +181,10 @@ export const getMyCourses = () =>
 export const submitCourseForReview = (id: string) =>
   post<void>(`/v1/courses/${id}/review`)
 
+/** 审核课程 (管理员) */
+export const auditCourse = (id: string, approved: boolean, auditRemark?: string) =>
+  put<void>(`/v1/admin/courses/${id}/audit`, { approved, auditRemark })
+
 export const deleteCourseDraft = (id: string) =>
   del<void>(`/v1/courses/${id}`)
 

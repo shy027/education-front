@@ -157,7 +157,13 @@ export const getReportDownloadUrl = (reportId: string) =>
 export const getCourseReportList = (courseId: string, params?: PageQuery) =>
   silentGet<PageResponse<ReportDTO>>(`/v1/reports/course/${courseId}`, params)
 
-export const getAllReportList = (params?: PageQuery & { courseId?: string; reportType?: number; startTime?: string; endTime?: string }) =>
+export const getAllReportList = (params?: PageQuery & { 
+  courseId?: string; 
+  reportType?: number; 
+  schoolId?: string;
+  startTime?: string; 
+  endTime?: string 
+}) =>
   silentGet<PageResponse<ReportDTO>>('/v1/reports', params)
 
 export const deleteReport = (reportId: string) =>

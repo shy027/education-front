@@ -93,7 +93,7 @@ export interface UserManageItem {
   department: string | null
   className: string | null
   studentNo: string | null
-  createdAt: string
+  createdTime: string
 }
 
 /** 用户管理查询参数 */

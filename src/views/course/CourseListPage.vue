@@ -183,7 +183,7 @@ const query = reactive({
   keyword: '',
   subjectArea: '' as string | undefined,
   joinType: undefined as number | undefined,
-  status: 1 as number | undefined, // 默认显示进行中
+  status: undefined as number | undefined, // 默认不限
   pageNum: 1,
   pageSize: 12,
 })
@@ -296,18 +296,20 @@ async function fetchList() {
         ...query,
         subjectArea: query.subjectArea || undefined,
         joinType: query.joinType,
-        status: query.status !== undefined ? query.status : 1, // 全部课程默认显示“进行中”(1)
+        status: query.status,
       })
       let list = res.list || res.records || []
       
-      //需求：不显示已结课的课程。如果后端返回了已结课的（例如判定标准不一），前端二次过滤
-      const filtered = list.filter((c) => getCalculatedStatus(c) !== 'finished')
+      // 需求：仅显示审核通过 (auditStatus === 1) 且未结课的课程
+      const filtered = list.filter((c) => {
+        const isApproved = (c.auditStatus === 1)
+        const isNotFinished = (getCalculatedStatus(c) !== 'finished')
+        return isApproved && isNotFinished
+      })
       courseList.value = filtered
       
-      // 修正总数显示：如果后端返回的总数很大，但经过前端过滤后本页变少了，
-      // 我们至少保证 total 不会引导用户翻到完全空的后几页（虽然这只是权宜之计）
+      // 修正总数显示
       if (list.length > filtered.length) {
-        // 如果本页有被过滤掉的，说明 total 统计了已结课的，这里做一个近似偏移
         const loss = list.length - filtered.length
         total.value = Math.max(0, res.total - loss)
       } else {
@@ -333,10 +335,6 @@ function handleReset() {
 function switchTab(tab: 'all' | 'mine') {
   activeTab.value = tab
   query.pageNum = 1
-  // 切换到全部课程时，如果没有手动选状态，默认设为1（进行中）
-  if (tab === 'all' && query.status === undefined) {
-    query.status = 1
-  }
   fetchList()
 }
 

@@ -156,13 +156,29 @@ const routes: RouteRecordRaw[] = [
     children: [
       {
         path: '',
-        redirect: '/admin/dashboard',
+        redirect: () => {
+          const authStore = useAuthStore()
+          if (authStore.isSchoolLeader) return '/admin/school-info'
+          return '/admin/dashboard'
+        }
       },
       {
         path: 'dashboard',
         name: 'AdminDashboard',
         component: () => import('@/views/admin/DashboardPage.vue'),
         meta: { title: '数据看板', icon: 'DataBoard' },
+      },
+      {
+        path: 'school-info',
+        name: 'AdminSchoolInfo',
+        component: () => import('@/views/admin/SchoolInfoPage.vue'),
+        meta: { title: '学校信息', icon: 'OfficeBuilding', roles: ['SCHOOL_LEADER', 'ADMIN'] },
+      },
+      {
+        path: 'courses',
+        name: 'AdminCourses',
+        component: () => import('@/views/admin/CoursesPage.vue'),
+        meta: { title: '课程管理', icon: 'Reading', roles: ['ADMIN'] },
       },
       {
         path: 'users',
@@ -174,13 +190,13 @@ const routes: RouteRecordRaw[] = [
         path: 'schools',
         name: 'AdminSchools',
         component: () => import('@/views/admin/SchoolsPage.vue'),
-        meta: { title: '学校管理', icon: 'OfficeBuilding', roles: ['ADMIN'] },
+        meta: { title: '学校管理', icon: 'OfficeBuilding', roles: ['ADMIN', 'SCHOOL_LEADER'] },
       },
       {
         path: 'audit',
         name: 'AdminAudit',
         component: () => import('@/views/admin/AuditPage.vue'),
-        meta: { title: '审核中心', icon: 'CircleCheckFilled', roles: ['ADMIN', 'SCHOOL_LEADER'] },
+        meta: { title: '审核中心', icon: 'CircleCheckFilled', roles: ['ADMIN'] },
       },
       {
         path: 'resources',

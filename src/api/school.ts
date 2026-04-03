@@ -2,7 +2,7 @@
  * 学校服务 API
  * 后端路由前缀：/api/v1/schools
  */
-import { get, post } from '@/utils/request'
+import { get, post, put } from '@/utils/request'
 
 
 // ===================== 类型定义 =====================
@@ -19,10 +19,22 @@ export interface SchoolItem {
   teacherCount?: number
   studentCount?: number
   courseCount?: number
+  contactPhone?: string
 }
 
 export interface JoinSchoolRequest {
   inviteCode?: string
+}
+
+export interface SchoolRequest {
+  schoolName: string
+  schoolCode?: string
+  province?: string
+  city?: string
+  address?: string
+  logoUrl?: string
+  description?: string
+  contactPhone?: string
 }
 
 // ===================== API =====================
@@ -52,3 +64,7 @@ export const getDepartments = (schoolId: string) =>
 /** 获取学院下的班级列表 */
 export const getClasses = (schoolId: string, department: string) =>
   get<string[]>(`/v1/schools/${schoolId}/classes`, { department })
+
+/** 更新学校信息 (需管理权限) */
+export const updateSchool = (id: string | number, data: SchoolRequest) =>
+  put<void>(`/v1/schools/${id}`, data)

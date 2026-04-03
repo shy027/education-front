@@ -12,7 +12,7 @@
     <!-- 筛选条件 -->
     <el-card class="filter-card" shadow="never">
       <el-form :model="query" inline size="default">
-        <el-form-item label="所属学校">
+        <el-form-item label="所属学校" v-if="authStore.isAdmin">
           <el-select v-model="query.schoolId" placeholder="全部学校" clearable style="width: 160px" @change="handleSchoolChange">
             <el-option 
               v-for="s in schoolList" 
@@ -78,7 +78,7 @@
           <template #default="{ row }">
             <div class="user-info-cell">
               <span class="user-name">{{ userMap[row.userId]?.realName || '未知用户' }}</span>
-              <span class="user-id">#{{ row.userId }}</span>
+              <span class="user-id">@{{ userMap[row.userId]?.username || row.userId }}</span>
             </div>
           </template>
         </el-table-column>
@@ -150,9 +150,11 @@ import { getProfileList } from '@/api/report'
 import { getSchoolList, getDepartments, getClasses } from '@/api/school'
 import { getPublishedCourses } from '@/api/course'
 import { batchGetUsers } from '@/api/user'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
 const route = useRoute()
+const authStore = useAuthStore()
 const isCourseView = computed(() => !!route.query.courseId)
 const loading = ref(false)
 const tableData = ref<any[]>([])
@@ -202,7 +204,9 @@ function handleReset() {
   query.current = 1
   query.size = 10
   query.courseId = '0'
-  query.schoolId = undefined
+  query.schoolId = (authStore.isSchoolLeader && authStore.userInfo?.schoolId) 
+    ? String(authStore.userInfo.schoolId) 
+    : undefined
   query.department = undefined
   query.className = undefined
   departmentOptions.value = []
@@ -268,10 +272,17 @@ function formatDateTime(time: string) {
   return time.replace('T', ' ').substring(0, 16)
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (route.query.courseId) {
     query.courseId = String(route.query.courseId)
   }
+  // 校领导初始化锁定学校
+  if (authStore.isSchoolLeader && authStore.userInfo?.schoolId) {
+    query.schoolId = String(authStore.userInfo.schoolId)
+    // 联动加载院系
+    handleSchoolChange()
+  }
+  
   fetchList()
   fetchSchools()
   fetchCourses()

@@ -46,7 +46,7 @@
 
     <!-- 底部操作与通知 -->
     <el-card class="operation-card" shadow="never">
-      <div class="audit-notice" v-if="stats.pendingAudits > 0">
+      <div class="audit-notice" v-if="stats.pendingAudits > 0 && authStore.isAdmin">
         <el-alert
           :title="`当前有 ${stats.pendingAudits} 项待审核内容，请及时处理。`"
           type="warning"
@@ -74,6 +74,9 @@ import { ref, onMounted, onUnmounted, markRaw, nextTick } from 'vue'
 import { UserFilled, Reading, FolderOpened, CircleCheckFilled } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import { getDashboardStats, type DashboardStats } from '@/api/report'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
 
 const stats = ref<Partial<DashboardStats>>({
   totalUsers: 0,

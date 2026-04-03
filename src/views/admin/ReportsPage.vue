@@ -10,6 +10,24 @@
     <!-- 搜索筛选 -->
     <el-card shadow="never" class="filter-card">
       <div class="filter-row">
+        <!-- 学校筛选 (仅管理员可见) -->
+        <el-select
+          v-if="authStore.isAdmin"
+          v-model="query.schoolId"
+          placeholder="所属学校"
+          clearable
+          filterable
+          style="width: 180px"
+          @change="handleSearch"
+        >
+          <el-option
+            v-for="item in schoolList"
+            :key="item.id"
+            :label="item.schoolName"
+            :value="String(item.id)"
+          />
+        </el-select>
+
         <el-input v-model="query.courseId" placeholder="课程ID" clearable style="width:160px" />
         <el-select v-model="query.reportType" placeholder="报告类型" clearable style="width:140px">
           <el-option label="课程报告" :value="1" />
@@ -78,10 +96,13 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getAllReportList, getReportDownloadUrl, deleteReport } from '@/api/report'
+import { getSchoolList } from '@/api/school'
+import { useAuthStore } from '@/stores/auth'
 import type { ReportDTO } from '@/api/report'
 
+const authStore = useAuthStore()
 const query = reactive<{
-  courseId?: string; reportType?: number;
+  courseId?: string; reportType?: number; schoolId?: string;
   startTime?: string; endTime?: string;
   pageNum: number; pageSize: number;
 }>({ pageNum: 1, pageSize: 15 })
@@ -90,6 +111,7 @@ const loading = ref(false)
 const reports = ref<ReportDTO[]>([])
 const total = ref(0)
 const dateRange = ref<[string, string] | null>(null)
+const schoolList = ref<any[]>([])
 
 const dateShortcuts = [
   { text: '最近一周', value: () => { const e = new Date(); const s = new Date(); s.setDate(s.getDate()-6); return [s, e] } },
@@ -115,6 +137,9 @@ function handleSearch() { query.pageNum = 1; fetchReports() }
 function resetFilter() {
   query.courseId = undefined
   query.reportType = undefined
+  if (authStore.isAdmin) {
+    query.schoolId = undefined
+  }
   query.startTime = undefined
   query.endTime = undefined
   dateRange.value = null
@@ -132,7 +157,18 @@ async function deleteReportById(reportId: string) {
   fetchReports()
 }
 
-onMounted(fetchReports)
+onMounted(async () => {
+  if (authStore.isAdmin) {
+    const res = await getSchoolList()
+    schoolList.value = res?.list || []
+  }
+
+  if (authStore.isSchoolLeader && authStore.userInfo?.schoolId) {
+    query.schoolId = String(authStore.userInfo.schoolId)
+  }
+
+  fetchReports()
+})
 </script>
 
 <style scoped>

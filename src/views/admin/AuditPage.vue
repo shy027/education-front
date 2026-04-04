@@ -22,7 +22,7 @@
     <el-card class="audit-card" shadow="never">
       <el-tabs v-model="activeTab" @tab-click="onTabSwitch">
         <el-tab-pane label="全部" name="all" />
-        <el-tab-pane label="课件" name="COURSEWARE" />
+        <el-tab-pane label="课程" name="COURSE" />
         <el-tab-pane label="讨论话题" name="POST" />
         <el-tab-pane label="讨论评论" name="COMMENT" />
         <el-tab-pane label="资源" name="RESOURCE" />
@@ -160,7 +160,7 @@ import { getPendingList, auditRecord, batchAudit, getAuditHistory } from '@/api/
 import type { AuditRecord, AuditPendingQuery, AuditHistoryQuery } from '@/api/audit'
 
 // ───── Tab ─────
-const activeTab = ref<'all' | 'COURSEWARE' | 'POST' | 'COMMENT' | 'RESOURCE' | 'history'>('all')
+const activeTab = ref<'all' | 'COURSE' | 'POST' | 'COMMENT' | 'RESOURCE' | 'history'>('all')
 
 function onTabSwitch() {
   if (activeTab.value === 'history') {
@@ -168,6 +168,10 @@ function onTabSwitch() {
     fetchHistory()
   } else {
     pendingQuery.pageNum = 1
+    // 直接在此处设置 contentType，避免 tab-click 与 v-model 的时序问题
+    pendingQuery.contentType = activeTab.value === 'all'
+      ? undefined
+      : activeTab.value as AuditPendingQuery['contentType']
     fetchPending()
   }
 }
@@ -190,13 +194,11 @@ const pendingQuery = reactive<AuditPendingQuery>({
 async function fetchPending() {
   loading.value = true
   try {
-    const contentType = activeTab.value === 'all' || activeTab.value === 'history'
-      ? undefined
-      : activeTab.value as AuditPendingQuery['contentType']
-    const res = await getPendingList({ ...pendingQuery, contentType })
+    // contentType 已在 onTabSwitch 中写入 pendingQuery，直接使用
+    const res = await getPendingList({ ...pendingQuery })
     pendingList.value = res?.list || res?.records || []
     pendingTotal.value = res?.total ?? 0
-    if (activeTab.value === 'all') pendingCount.value = res?.total ?? 0
+    if (!pendingQuery.contentType) pendingCount.value = res?.total ?? 0
   } finally { loading.value = false }
 }
 
@@ -294,9 +296,9 @@ const pageSize = computed({
 })
 
 // ───── 辅助函数 ─────
-function contentTypeLabel(t: string): string { return { COURSEWARE: '课件', POST: '话题', COMMENT: '评论', RESOURCE: '资源' }[t] ?? t }
+function contentTypeLabel(t: string): string { return { COURSE: '课程', POST: '话题', COMMENT: '评论', RESOURCE: '资源' }[t] ?? t }
 function contentTypeTagType(t: string): 'primary' | 'info' | 'success' | 'warning' {
-  return ({ COURSEWARE: 'primary', POST: 'success', COMMENT: 'info', RESOURCE: 'warning' } as Record<string, 'primary' | 'info' | 'success' | 'warning'>)[t] ?? 'info'
+  return ({ COURSE: 'primary', POST: 'success', COMMENT: 'info', RESOURCE: 'warning' } as Record<string, 'primary' | 'info' | 'success' | 'warning'>)[t] ?? 'info'
 }
 function riskLabel(l: number): string { return { 1: '低', 2: '中', 3: '高' }[l] ?? '—' }
 function riskTagType(l: number): 'info' | 'success' | 'warning' | 'danger' {

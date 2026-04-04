@@ -10,7 +10,7 @@ import type { PageQuery, PageResponse } from '@/types/api'
 
 export interface AuditRecord {
   id: string
-  contentType: 'COURSEWARE' | 'POST' | 'COMMENT' | 'RESOURCE'
+  contentType: 'COURSE' | 'POST' | 'COMMENT' | 'RESOURCE'
   contentId: string
   contentTitle: string
   contentPreview?: string
@@ -27,7 +27,7 @@ export interface AuditRecord {
 }
 
 export interface AuditPendingQuery extends PageQuery {
-  contentType?: 'COURSEWARE' | 'POST' | 'COMMENT' | 'RESOURCE'
+  contentType?: 'COURSE' | 'POST' | 'COMMENT' | 'RESOURCE'
   riskLevel?: number
 }
 

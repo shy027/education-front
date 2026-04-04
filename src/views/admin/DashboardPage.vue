@@ -132,7 +132,12 @@ const updateCharts = (data: DashboardStats) => {
   courseChart?.setOption({
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-    xAxis: { type: 'category', data: subjectNames, axisTick: { alignWithLabel: true } },
+    xAxis: { 
+      type: 'category', 
+      data: subjectNames, 
+      axisTick: { alignWithLabel: true },
+      axisLabel: { interval: 0, rotate: 30 }
+    },
     yAxis: { type: 'value' },
     series: [{
       name: '课程数量',

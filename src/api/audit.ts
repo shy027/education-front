@@ -9,21 +9,21 @@ import type { PageQuery, PageResponse } from '@/types/api'
 // ===================== 类型定义 =====================
 
 export interface AuditRecord {
-  id: string
+  recordId: string
   contentType: 'COURSE' | 'POST' | 'COMMENT' | 'RESOURCE'
   contentId: string
   contentTitle: string
   contentPreview?: string
-  submitterId: string
-  submitterName: string
+  creatorId: string
+  creatorName: string
   riskLevel: number             // 1=低 2=中 3=高
-  riskReason?: string
-  status: number                // 0=待审核 1=通过 2=拒绝
+  riskReason?: string           // 对应后端 auditReason
+  auditResult: number           // 0=待审核 1=通过 2=拒绝
   auditorId?: string
   auditorName?: string
   auditTime?: string
-  submittedTime: string
-  auditComment?: string
+  createdTime: string
+  auditReason?: string
 }
 
 export interface AuditPendingQuery extends PageQuery {
@@ -51,11 +51,11 @@ export const getPendingList = (params?: AuditPendingQuery) =>
   get<PageResponse<AuditRecord>>('/v1/audit/pending', params)
 
 /** 人工审核单条记录 */
-export const auditRecord = (recordId: string, data: { auditResult: number; auditComment?: string }) =>
+export const auditRecord = (recordId: string, data: { auditResult: number; auditReason?: string }) =>
   put<void>(`/v1/audit/${recordId}`, data)
 
 /** 批量审核 */
-export const batchAudit = (data: { recordIds: string[]; auditResult: number; auditComment?: string }) =>
+export const batchAudit = (data: { recordIds: string[]; auditResult: number; auditReason?: string }) =>
   put<BatchAuditResult>('/v1/audit/batch', data)
 
 /** 查询审核历史 */

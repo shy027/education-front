@@ -44,9 +44,9 @@
       </el-card>
     </div>
 
-    <!-- 底部操作与通知 -->
-    <el-card class="operation-card" shadow="never">
-      <div class="audit-notice" v-if="stats.pendingAudits > 0 && authStore.isAdmin">
+    <!-- 底部通知 -->
+    <el-card class="operation-card" shadow="never" v-if="stats.pendingAudits > 0 && authStore.isAdmin">
+      <div class="audit-notice">
         <el-alert
           :title="`当前有 ${stats.pendingAudits} 项待审核内容，请及时处理。`"
           type="warning"
@@ -57,13 +57,6 @@
             <el-button link type="warning" @click="$router.push('/admin/audit')" style="margin-left: 10px">立即前往</el-button>
           </template>
         </el-alert>
-      </div>
-      <div class="quick-links">
-        <span class="links-label">常用入口：</span>
-        <el-button @click="$router.push('/admin/users')" plain size="small">用户管理</el-button>
-        <el-button @click="$router.push('/admin/schools')" plain size="small">学校管理</el-button>
-        <el-button @click="$router.push('/admin/subject')" plain size="small">学科管理</el-button>
-        <el-button @click="$router.push('/admin/resources')" plain size="small">资源库</el-button>
       </div>
     </el-card>
   </div>
@@ -208,9 +201,6 @@ onUnmounted(() => {
 .chart-container { height: 320px; width: 100%; }
 
 .operation-card { border-radius: 16px !important; border: none !important; box-shadow: 0 4px 12px rgba(0,0,0,0.03) !important; }
-.audit-notice { margin-bottom: 20px; }
-.quick-links { display: flex; align-items: center; gap: 12px; }
-.links-label { font-size: 14px; color: #606266; font-weight: 500; }
 
 :deep(.el-card__header) { border-bottom: 1px solid #f0f0f0; padding: 18px 24px; }
 :deep(.el-alert) { border-radius: 12px; }

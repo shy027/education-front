@@ -219,15 +219,15 @@
           </el-avatar>
           <div>
             <div class="drawer-name">{{ drawerUser.realName || drawerUser.username }}</div>
-            <el-tag size="small" :type="roleTagType(drawerUser.roles?.[0])" style="margin-top:4px">
-              {{ ROLE_LABEL[drawerUser.roles?.[0]] ?? drawerUser.roles?.[0] }}
+            <el-tag size="small" :type="roleTagType(drawerUser.roles?.[0]?.roleCode)" style="margin-top:4px">
+              {{ drawerUser.roles?.[0]?.roleName || '—' }}
             </el-tag>
           </div>
         </div>
         <el-descriptions :column="1" border size="small" class="drawer-desc">
           <el-descriptions-item label="用户名">{{ drawerUser.username }}</el-descriptions-item>
           <el-descriptions-item label="真实姓名">{{ drawerUser.realName || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="手机号">{{ maskPhone(drawerUser.phone) }}</el-descriptions-item>
+          <el-descriptions-item label="手机号">{{ drawerUser.phone || '—' }}</el-descriptions-item>
           <el-descriptions-item label="邮箱">{{ drawerUser.email || '—' }}</el-descriptions-item>
           <el-descriptions-item label="学号/工号">{{ drawerUser.studentNo || '—' }}</el-descriptions-item>
           <el-descriptions-item label="所属学校">{{ drawerUser.schoolName || '—' }}</el-descriptions-item>
@@ -238,7 +238,7 @@
               {{ drawerUser.status === 1 ? '正常' : '禁用' }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="注册时间">{{ formatDate(drawerUser.createdAt) }}</el-descriptions-item>
+          <el-descriptions-item label="注册时间">{{ formatDate(drawerUser.createdTime) }}</el-descriptions-item>
         </el-descriptions>
         <div class="drawer-actions">
           <el-button
@@ -359,7 +359,8 @@ async function handleToggleStatus(row: UserManageItem & { _toggling?: boolean },
     `确定要 ${label} 用户「${row.realName || row.username}」吗？`,
     '操作确认',
     { type: 'warning', confirmButtonText: label, cancelButtonText: '取消' },
-  ).catch(() => { throw new Error('cancel') })
+  ).catch(() => { /* 静默退出 */ return })
+  if (!row) return // 防止非预期状态进入下一步
 
   row._toggling = true
   try {
@@ -378,7 +379,8 @@ async function handleResetPwd(row: UserManageItem) {
     `确定要重置用户「${row.realName || row.username}」的密码吗？`,
     '重置密码',
     { type: 'warning', confirmButtonText: '重置', cancelButtonText: '取消' },
-  ).catch(() => { throw new Error('cancel') })
+  ).catch(() => { /* 静默退出 */ return })
+  if (!row) return
 
   const res = await resetUserPassword(row.userId)
   ElMessageBox.alert(

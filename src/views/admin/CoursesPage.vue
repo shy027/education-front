@@ -2,8 +2,8 @@
   <div class="courses-mgmt-page">
     <div class="page-header">
       <div>
-        <h2 class="page-title">课程审核管理</h2>
-        <p class="page-desc">管理员审核教师提交的课程，控制平台课程合规与质量</p>
+        <h2 class="page-title">课程管理</h2>
+        <p class="page-desc">全站课程目录预览、查看详情与违规下架管理</p>
       </div>
     </div>
 
@@ -49,13 +49,16 @@
         <el-table-column label="创建时间" prop="createdTime" width="120">
           <template #default="{ row }">{{ row.createdTime?.slice(0,10) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
-            <el-button text size="small" @click="$router.push(`/course/${row.id}`)">查看</el-button>
-            <template v-if="row.auditStatus === 0">
-              <el-button text size="small" type="success" @click="handleAudit(row.id, 1)">通过</el-button>
-              <el-button text size="small" type="danger" @click="handleAuditReject(row.id)">拒绝</el-button>
-            </template>
+            <el-button text size="small" @click="$router.push(`/course/${row.id}`)">查看详情</el-button>
+            <el-button
+              v-if="row.auditStatus === 1"
+              text
+              size="small"
+              type="warning"
+              @click="handleOffline(row)"
+            >下架</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -79,14 +82,14 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Picture } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
-import { getCourseList, updateCourseStatus, auditCourse } from '@/api/course'
+import { getCourseList, updateCourseStatus } from '@/api/course'
 import type { CourseItem } from '@/api/course'
 
 const router = useRouter()
 
 const query = reactive({
   keyword: '',
-  auditStatus: 0 as number | undefined,
+  auditStatus: undefined as number | undefined,
   pageNum: 1,
   pageSize: 15
 })
@@ -111,31 +114,20 @@ function handleSearch() {
   fetchCourses()
 }
 
-/** 通过审核 */
-async function handleAudit(id: string, status: number) {
+/** 下架课程 */
+async function handleOffline(row: CourseItem) {
   try {
-    await auditCourse(id, true)
-    ElMessage.success('审核已通过，课程已发布')
+    await ElMessageBox.confirm(
+      `确定要下架课程《${row.courseName}》吗？下架后学生将无法搜索和加入该课程。`,
+      '下架提示',
+      { confirmButtonText: '确定下架', cancelButtonText: '取消', type: 'warning' }
+    )
+    // 根据后端实现，将 status 设为 0 (关闭/未发布)
+    await updateCourseStatus(row.id, 0)
+    ElMessage.success('课程已成功下架')
     fetchCourses()
   } catch (err) {
-    /* ignore */
-  }
-}
-
-/** 拒绝审核 */
-async function handleAuditReject(id: string) {
-  try {
-    const { value: comment } = await ElMessageBox.prompt('请输入拒绝理由', '审核拒绝', {
-      confirmButtonText: '确认拒绝',
-      cancelButtonText: '取消',
-      inputPlaceholder: '请输入原因...',
-    })
-    
-    await auditCourse(id, false, comment)
-    ElMessage.success('已拒绝该课程')
-    fetchCourses()
-  } catch (err) {
-    // 点击取消会进入这里
+    //
   }
 }
 

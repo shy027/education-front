@@ -61,6 +61,8 @@ export interface CategoryNode {
   categoryName: string
   parentId?: string
   sortOrder: number
+  status: number
+  createdTime?: string
   children: CategoryNode[]
 }
 
@@ -119,6 +121,12 @@ export const getCategoryTree = () =>
 
 export const createCategory = (data: { categoryName: string; parentId?: string; sortOrder?: number }) =>
   post<string>('/v1/categories', data)
+
+export const updateCategory = (id: string, data: { categoryName: string; parentId?: string; sortOrder?: number }) =>
+  put<void>(`/v1/categories/${id}`, data)
+
+export const updateCategoryStatus = (id: string, status: number) =>
+  put<void>(`/v1/categories/${id}/status`, null, { params: { status } })
 
 export const deleteCategory = (id: string) =>
   del<void>(`/v1/categories/${id}`)

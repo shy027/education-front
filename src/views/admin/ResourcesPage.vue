@@ -2,8 +2,8 @@
   <div class="resources-mgmt-page">
     <div class="page-header">
       <div>
-        <h2 class="page-title">资源审核管理</h2>
-        <p class="page-desc">管理员审核教师提交的资源，控制资源库内容质量</p>
+        <h2 class="page-title">资源管理</h2>
+        <p class="page-desc">全站资源库内容预览、查看详情与违规下架管理</p>
       </div>
     </div>
 
@@ -44,14 +44,16 @@
         <el-table-column label="创建时间" prop="createdTime" width="120">
           <template #default="{ row }">{{ row.createdTime?.slice(0,10) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
-            <el-button text size="small" @click="$router.push(`/resource/${row.id}`)">查看</el-button>
-            <template v-if="row.status === 1">
-              <el-button text size="small" type="success" @click="handleAudit(row.id, 1)">通过</el-button>
-              <el-button text size="small" type="danger" @click="handleAuditReject(row.id)">拒绝</el-button>
-            </template>
-            <el-button v-if="row.status === 2" text size="small" type="warning" @click="handleOffline(row.id)">下架</el-button>
+            <el-button text size="small" @click="$router.push(`/resource/${row.id}`)">查看详情</el-button>
+            <el-button
+              v-if="row.status === 2"
+              text
+              size="small"
+              type="warning"
+              @click="handleOffline(row)"
+            >下架</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -75,16 +77,18 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
-import { getResourceList, auditResource, offlineResource } from '@/api/resource'
+import { getResourceList, offlineResource } from '@/api/resource'
 import type { ResourceItem } from '@/api/resource'
 
 const router = useRouter()
 
-// 默认查看待审核+已发布的资源（管理后台视角）
-const query = reactive<{
-  keyword?: string; status?: number;
-  pageNum: number; pageSize: number;
-}>({ status: 1, pageNum: 1, pageSize: 15 })
+// 默认查询全量资源（管理后台视角）
+const query = reactive({
+  keyword: undefined as string | undefined,
+  status: undefined as number | undefined,
+  pageNum: 1,
+  pageSize: 15
+})
 
 const loading = ref(false)
 const resources = ref<ResourceItem[]>([])
@@ -101,31 +105,20 @@ async function fetchResources() {
 
 function handleSearch() { query.pageNum = 1; fetchResources() }
 
-// 通过审核（auditResult=1）
-async function handleAudit(id: string, result: number) {
-  await auditResource(id, { auditResult: result })
-  ElMessage.success('审核通过')
-  fetchResources()
-}
-
-// 拒绝审核（auditResult=2，需填写理由）
-async function handleAuditReject(id: string) {
-  const { value: comment } = await ElMessageBox.prompt('请输入拒绝理由', '审核拒绝', {
-    confirmButtonText: '确认拒绝',
-    cancelButtonText: '取消',
-  })
-  if (comment === undefined) return
-  await auditResource(id, { auditResult: 2, auditRemark: comment })
-  ElMessage.success('已拒绝')
-  fetchResources()
-}
-
-// 下架
-async function handleOffline(id: string) {
-  await ElMessageBox.confirm('确定下架该资源？', '提示', { type: 'warning' })
-  await offlineResource(id)
-  ElMessage.success('已下架')
-  fetchResources()
+// 下架确认与执行
+async function handleOffline(row: ResourceItem) {
+  try {
+    await ElMessageBox.confirm(
+      `确定下架资源《${row.title}》吗？下架后前台用户将无法访问。`,
+      '提示',
+      { confirmButtonText: '确定下架', cancelButtonText: '取消', type: 'warning' }
+    )
+    await offlineResource(row.id)
+    ElMessage.success('已下架')
+    fetchResources()
+  } catch (err) {
+    //
+  }
 }
 
 onMounted(fetchResources)

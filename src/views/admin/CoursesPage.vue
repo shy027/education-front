@@ -41,9 +41,19 @@
         <el-table-column label="状态" width="100">
           <template #default="{ row }">
             <el-tag
-              :type="(['info','success','danger'] as const)[row.auditStatus] ?? 'info'"
+              v-if="row.auditStatus === 1"
+              :type="row.status === 1 ? 'success' : 'info'"
               size="small"
-            >{{ ['待审核','已发布','已拒绝'][row.auditStatus] || '草稿' }}</el-tag>
+            >
+              {{ row.status === 1 ? '已发布' : (row.status === 2 ? '已结课' : '已下架') }}
+            </el-tag>
+            <el-tag
+              v-else
+              :type="row.auditStatus === 0 ? 'warning' : (row.auditStatus === 2 ? 'danger' : 'info')"
+              size="small"
+            >
+              {{ row.auditStatus === 0 ? '待审核' : (row.auditStatus === 2 ? '已拒绝' : '草稿') }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="创建时间" prop="createdTime" width="120">
@@ -52,13 +62,22 @@
         <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
             <el-button text size="small" @click="$router.push(`/course/${row.id}`)">查看详情</el-button>
-            <el-button
-              v-if="row.auditStatus === 1"
-              text
-              size="small"
-              type="warning"
-              @click="handleOffline(row)"
-            >下架</el-button>
+            <template v-if="row.auditStatus === 1">
+              <el-button
+                v-if="row.status === 1"
+                text
+                size="small"
+                type="warning"
+                @click="handleToggleStatus(row, 0)"
+              >下架</el-button>
+              <el-button
+                v-else-if="row.status === 0"
+                text
+                size="small"
+                type="success"
+                @click="handleToggleStatus(row, 1)"
+              >上架</el-button>
+            </template>
           </template>
         </el-table-column>
       </el-table>
@@ -114,17 +133,17 @@ function handleSearch() {
   fetchCourses()
 }
 
-/** 下架课程 */
-async function handleOffline(row: CourseItem) {
+/** 上下架控制 */
+async function handleToggleStatus(row: CourseItem, newStatus: number) {
+  const actionText = newStatus === 1 ? '上架' : '下架'
   try {
     await ElMessageBox.confirm(
-      `确定要下架课程《${row.courseName}》吗？下架后学生将无法搜索和加入该课程。`,
-      '下架提示',
-      { confirmButtonText: '确定下架', cancelButtonText: '取消', type: 'warning' }
+      `确定要${actionText}课程《${row.courseName}》吗？${newStatus === 0 ? '下架后学生将无法搜索和加入该课程。' : '上架后课程将重新对学生开放。'}`,
+      `${actionText}提示`,
+      { confirmButtonText: `确定${actionText}`, cancelButtonText: '取消', type: newStatus === 1 ? 'success' : 'warning' }
     )
-    // 根据后端实现，将 status 设为 0 (关闭/未发布)
-    await updateCourseStatus(row.id, 0)
-    ElMessage.success('课程已成功下架')
+    await updateCourseStatus(row.id, newStatus)
+    ElMessage.success(`课程已成功${actionText}`)
     fetchCourses()
   } catch (err) {
     //

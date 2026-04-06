@@ -54,6 +54,13 @@
               type="warning"
               @click="handleOffline(row)"
             >下架</el-button>
+            <el-button
+              v-if="row.status === 3 || row.status === 4"
+              text
+              size="small"
+              type="primary"
+              @click="handleOnline(row)"
+            >上架</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -77,7 +84,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
-import { getResourceList, offlineResource } from '@/api/resource'
+import { getResourceList, offlineResource, onlineResource } from '@/api/resource'
 import type { ResourceItem } from '@/api/resource'
 
 const router = useRouter()
@@ -115,6 +122,23 @@ async function handleOffline(row: ResourceItem) {
     )
     await offlineResource(row.id)
     ElMessage.success('已下架')
+    fetchResources()
+  } catch (err) {
+    //
+  }
+}
+
+// 上架确认与执行
+async function handleOnline(row: ResourceItem) {
+  try {
+    const actionText = row.status === 3 ? '重新申请上架' : '上架'
+    await ElMessageBox.confirm(
+      `确定${actionText}资源《${row.title}》吗？上架后前台用户将可以正常访问。`,
+      '提示',
+      { confirmButtonText: '确定上架', cancelButtonText: '取消', type: 'primary' }
+    )
+    await onlineResource(row.id)
+    ElMessage.success('已上架')
     fetchResources()
   } catch (err) {
     //

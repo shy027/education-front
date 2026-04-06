@@ -105,16 +105,45 @@ const updateCharts = (data: DashboardStats) => {
   // 资源分布饼图
   const resourceData = Object.entries(data.typeDistribution || {}).map(([name, value]) => ({ name, value }))
   resourceChart?.setOption({
-    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
-    legend: { bottom: '0%', left: 'center' },
+    tooltip: { 
+      trigger: 'item', 
+      formatter: '{b}: <b style="color:#d32f2f">{c}</b> ({d}%)',
+      backgroundColor: 'rgba(255, 255, 255, 0.96)',
+      borderColor: '#eee',
+      borderWidth: 1,
+      textStyle: { color: '#333' }
+    },
+    legend: { 
+      type: 'scroll',
+      bottom: '2%', 
+      left: 'center',
+      itemWidth: 10,
+      itemHeight: 10,
+      textStyle: { color: '#909399', fontSize: 12 }
+    },
     color: ['#ff5252', '#409eff', '#67c23a', '#e6a23c', '#909399'],
     series: [{
+      name: '资源分布',
       type: 'pie',
-      radius: ['40%', '70%'],
-      avoidLabelOverlap: false,
-      itemStyle: { borderRadius: 10, borderColor: '#fff', borderWidth: 2 },
-      label: { show: false, position: 'center' },
-      emphasis: { label: { show: true, fontSize: '18', fontWeight: 'bold' } },
+      radius: ['45%', '72%'],
+      center: ['50%', '45%'],
+      avoidLabelOverlap: true,
+      itemStyle: { 
+        borderRadius: 8, 
+        borderColor: '#fff', 
+        borderWidth: 2 
+      },
+      label: { show: false },
+      emphasis: { 
+        scale: true,
+        scaleSize: 10,
+        label: { 
+          show: true, 
+          fontSize: '16', 
+          fontWeight: 'bold',
+          formatter: '{b}\n{d}%' 
+        } 
+      },
       data: resourceData
     }]
   })
@@ -122,26 +151,81 @@ const updateCharts = (data: DashboardStats) => {
   // 学科课程柱状图
   const subjectNames = Object.keys(data.subjectDistribution || {})
   const subjectValues = Object.values(data.subjectDistribution || {})
+  
+  // 动态计算是否需要滚动条
+  const showDataZoom = subjectNames.length > 8
+
   courseChart?.setOption({
-    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
-    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    tooltip: { 
+      trigger: 'axis', 
+      axisPointer: { type: 'shadow' },
+      backgroundColor: 'rgba(255, 255, 255, 0.96)',
+      borderColor: '#eee',
+      borderWidth: 1,
+      textStyle: { color: '#333' }
+    },
+    grid: { 
+      top: '12%',
+      left: '5%', 
+      right: '5%', 
+      bottom: showDataZoom ? '18%' : '12%', 
+      containLabel: true 
+    },
     xAxis: { 
       type: 'category', 
       data: subjectNames, 
-      axisTick: { alignWithLabel: true },
-      axisLabel: { interval: 0, rotate: 30 }
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: '#f0f0f0' } },
+      axisLabel: { 
+        interval: 0, 
+        rotate: subjectNames.length > 5 ? 35 : 0,
+        color: '#909399',
+        fontSize: 11,
+        overflow: 'truncate',
+        width: 80
+      }
     },
-    yAxis: { type: 'value' },
+    yAxis: { 
+      type: 'value',
+      axisLine: { show: false },
+      splitLine: { lineStyle: { type: 'dashed', color: '#f5f5f5' } },
+      axisLabel: { color: '#909399' }
+    },
+    dataZoom: showDataZoom ? [{
+      type: 'slider',
+      show: true,
+      xAxisIndex: [0],
+      start: 0,
+      end: (8 / subjectNames.length) * 100, // 默认显示前 8 个
+      height: 18,
+      bottom: '2%',
+      borderColor: 'transparent',
+      backgroundColor: '#f8f9fa',
+      fillerColor: 'rgba(64, 158, 255, 0.2)',
+      handleIcon: 'path://M512,512m-448,0a448,448,0,1,1,896,0a448,448,0,1,1,-896,0Z',
+      handleSize: '100%',
+      showDetail: false
+    }] : [],
     series: [{
       name: '课程数量',
       type: 'bar',
-      barWidth: '40%',
+      barWidth: '35%',
+      showBackground: true,
+      backgroundStyle: { color: '#fbfcff', borderRadius: 6 },
       itemStyle: {
+        borderRadius: [6, 6, 0, 0],
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: '#83bff6' },
-          { offset: 0.5, color: '#188df0' },
-          { offset: 1, color: '#188df0' }
+          { offset: 0, color: '#66b1ff' },
+          { offset: 1, color: '#409eff' }
         ])
+      },
+      emphasis: {
+        itemStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: '#409eff' },
+            { offset: 1, color: '#337ecc' }
+          ])
+        }
       },
       data: subjectValues
     }]

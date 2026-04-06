@@ -114,6 +114,9 @@ export const getResourceAuditLogs = (id: string) =>
 export const offlineResource = (id: string) =>
   post<void>(`/v1/resources/${id}/offline`)
 
+export const onlineResource = (id: string) =>
+  post<void>(`/v1/resources/${id}/online`)
+
 // ===================== 分类 =====================
 
 export const getCategoryTree = () =>

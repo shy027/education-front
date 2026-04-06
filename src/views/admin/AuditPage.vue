@@ -180,6 +180,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getPendingList, auditRecord, batchAudit, getAuditHistory } from '@/api/audit'
 import type { AuditRecord, AuditPendingQuery, AuditHistoryQuery } from '@/api/audit'
+import { getDashboardStats } from '@/api/report'
 
 // ───── Tab ─────
 const activeTab = ref<'all' | 'COURSE' | 'POST' | 'COMMENT' | 'RESOURCE' | 'history'>('all')
@@ -237,6 +238,19 @@ async function fetchPending() {
       pendingCount.value = res?.total ?? 0
     }
   } finally { loading.value = false }
+}
+
+// 获取总体审核统计数据 (用于页面头部的存量数据展示)
+async function fetchStats() {
+  try {
+    const res = await getDashboardStats()
+    if (res) {
+      pendingCount.value = Number(res.pendingAudits || 0)
+      todayApproved.value = Number(res.todayApproved || 0)
+    }
+  } catch (err) {
+    console.error('获取审核统计失败', err)
+  }
 }
 
 function handleSelection(rows: AuditRecord[]) {
@@ -360,6 +374,7 @@ function riskTagType(l: number): 'info' | 'success' | 'warning' | 'danger' {
 
 onMounted(() => {
   fetchPending()
+  fetchStats()
 })
 </script>
 

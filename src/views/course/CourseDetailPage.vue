@@ -66,12 +66,26 @@
             >审核中 (基础信息已锁定)</el-button>
             <!-- 审核通过状态：编辑按钮消失 (符合需求: 审核通过一行的四个按钮全部消失) -->
             <!-- 需求：增加查看报告按钮，仅限本人且审核通过 -->
-            <el-button
-              v-if="course.auditStatus === 1"
-              type="info"
-              :icon="DataAnalysis"
-              @click="$router.push({ path: '/report', query: { courseId: course.id } })"
-            >查看教学报告</el-button>
+            <template v-if="course.auditStatus === 1">
+              <el-button
+                type="info"
+                :icon="DataAnalysis"
+                @click="$router.push({ path: '/report', query: { courseId: course.id } })"
+              >查看教学报告</el-button>
+              
+              <!-- 快捷上下架控制 -->
+              <el-button
+                v-if="course.status === 1"
+                type="warning"
+                plain
+                @click="handleToggleStatus(0)"
+              >违规下架</el-button>
+              <el-button
+                v-else-if="course.status === 0"
+                type="success"
+                @click="handleToggleStatus(1)"
+              >立即上架</el-button>
+            </template>
           </template>
         </div>
       </div>
@@ -818,6 +832,7 @@ import {
   unbindChapterResource,
   submitCourseForReview,
   deleteCourseDraft,
+  updateCourseStatus,
   checkMembership, // Added checkMembership import
 } from '@/api/course'
 import type { PageResponse } from '@/types/api'
@@ -1012,10 +1027,11 @@ const canInteract = computed(() => {
   return false
 })
 
-function getCalculatedStatus(c: CourseItem): 'draft' | 'audit' | 'rejected' | 'notStarted' | 'ongoing' | 'finished' {
+function getCalculatedStatus(c: CourseItem): 'draft' | 'audit' | 'rejected' | 'offline' | 'notStarted' | 'ongoing' | 'finished' {
   if (c.auditStatus === -1) return 'draft'
   if (c.auditStatus === 0) return 'audit'
   if (c.auditStatus === 2) return 'rejected'
+  if (c.status === 0) return 'offline'
   const now = new Date()
   if (c.startTime && new Date(c.startTime) > now) return 'notStarted'
   if (c.endTime && new Date(c.endTime) < now) return 'finished'
@@ -1027,6 +1043,7 @@ function statusType(c: CourseItem): undefined | 'info' | 'success' | 'warning' |
   if (s === 'draft') return 'info'
   if (s === 'audit') return 'warning'
   if (s === 'rejected') return 'danger'
+  if (s === 'offline') return 'info'
   if (s === 'notStarted') return 'info'
   if (s === 'ongoing') return 'success'
   if (s === 'finished') return 'info'
@@ -1038,6 +1055,7 @@ function statusLabel(c: CourseItem): string {
   if (s === 'draft') return '草稿'
   if (s === 'audit') return '审核中'
   if (s === 'rejected') return '已拒绝'
+  if (s === 'offline') return '已下架'
   if (s === 'notStarted') return '暂未开放'
   if (s === 'ongoing') return '进行中'
   if (s === 'finished') return '已结课'
@@ -1204,6 +1222,23 @@ async function handleSubmitReview() {
     ElMessage.error(err.message || '提交失败')
   } finally {
     submittingReview.value = false
+  }
+}
+
+async function handleToggleStatus(newStatus: number) {
+  const actionText = newStatus === 1 ? '上架' : '下架'
+  await ElMessageBox.confirm(`确定要${actionText}该课程吗？`, '操作确认', {
+    type: 'warning'
+  })
+  
+  try {
+    await updateCourseStatus(courseId.value, newStatus)
+    ElMessage.success(`课程已成功${actionText}`)
+    if (course.value) {
+      course.value.status = newStatus
+    }
+  } catch (err: any) {
+    ElMessage.error(`${actionText}失败`)
   }
 }
 

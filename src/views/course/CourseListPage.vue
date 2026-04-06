@@ -295,26 +295,10 @@ async function fetchList() {
       const res = await getCourseList({
         ...query,
         subjectArea: query.subjectArea || undefined,
-        joinType: query.joinType,
-        status: query.status,
+        auditStatus: 1, // 前台课程中心只显示审核通过的
       })
-      let list = res.list || res.records || []
-      
-      // 需求：仅显示审核通过 (auditStatus === 1) 且未结课的课程
-      const filtered = list.filter((c) => {
-        const isApproved = (c.auditStatus === 1)
-        const isNotFinished = (getCalculatedStatus(c) !== 'finished')
-        return isApproved && isNotFinished
-      })
-      courseList.value = filtered
-      
-      // 修正总数显示
-      if (list.length > filtered.length) {
-        const loss = list.length - filtered.length
-        total.value = Math.max(0, res.total - loss)
-      } else {
-        total.value = res.total
-      }
+      courseList.value = res.list || res.records || []
+      total.value = res.total || 0
     }
   } finally {
     loading.value = false
@@ -340,10 +324,11 @@ function switchTab(tab: 'all' | 'mine') {
 
 // ───── 标签显示 ─────
 /** 综合计算课程状态 */
-function getCalculatedStatus(c: CourseItem): 'draft' | 'audit' | 'rejected' | 'notStarted' | 'ongoing' | 'finished' {
+function getCalculatedStatus(c: CourseItem): 'draft' | 'audit' | 'rejected' | 'offline' | 'notStarted' | 'ongoing' | 'finished' {
   if (c.auditStatus === -1) return 'draft'
   if (c.auditStatus === 0) return 'audit'
   if (c.auditStatus === 2) return 'rejected'
+  if (c.status === 0) return 'offline'
   const now = new Date()
   if (c.startTime && new Date(c.startTime) > now) return 'notStarted'
   if (c.endTime && new Date(c.endTime) < now) return 'finished'
@@ -355,6 +340,7 @@ function statusType(c: CourseItem): '' | 'info' | 'success' | 'warning' | 'dange
   if (s === 'draft') return 'info'
   if (s === 'audit') return 'warning'
   if (s === 'rejected') return 'danger'
+  if (s === 'offline') return 'info'
   if (s === 'notStarted') return 'info'
   if (s === 'ongoing') return 'success'
   if (s === 'finished') return 'info'
@@ -369,6 +355,7 @@ function statusLabel(c: CourseItem): string {
   if (s === 'draft') return '草稿'
   if (s === 'audit') return '审核中'
   if (s === 'rejected') return '已拒绝'
+  if (s === 'offline') return '已下架'
   if (s === 'notStarted') return '暂未开放'
   if (s === 'ongoing') return '进行中'
   if (s === 'finished') return '已结课'

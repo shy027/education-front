@@ -266,7 +266,7 @@ import {
 } from '@element-plus/icons-vue'
 import {
   getUserList, getUserDetail, updateUserStatus,
-  resetUserPassword, importUsers, getAllRoles,
+  resetUserPassword, importUsers, getAllRoles, downloadUserTemplate,
 } from '@/api/user'
 import { getSchoolList } from '@/api/school'
 import { ROLE_LABEL } from '@/constants'
@@ -403,18 +403,21 @@ async function handleViewDetail(row: UserManageItem) {
 }
 
 // ───── 下载模板 ─────
-function handleDownloadTemplate() {
-  // 直接触发后端下载流
-  const token = localStorage.getItem('edu-auth')
-    ? JSON.parse(localStorage.getItem('edu-auth')!).token
-    : ''
-  const url = `/api/v1/users/manage/template`
-  const a = document.createElement('a')
-  a.href = url
-  a.download = '用户导入模板.xlsx'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
+async function handleDownloadTemplate() {
+  try {
+    const blob = await downloadUserTemplate()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = '用户导入模板.xlsx'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('下载模板失败', err)
+    // 错误已由拦截器处理
+  }
 }
 
 // ───── 批量导入 ─────

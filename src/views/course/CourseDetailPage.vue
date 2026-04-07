@@ -73,18 +73,20 @@
                 @click="$router.push({ path: '/report', query: { courseId: course.id } })"
               >查看教学报告</el-button>
               
-              <!-- 快捷上下架控制 -->
-              <el-button
-                v-if="course.status === 1"
-                type="warning"
-                plain
-                @click="handleToggleStatus(0)"
-              >违规下架</el-button>
-              <el-button
-                v-else-if="course.status === 0"
-                type="success"
-                @click="handleToggleStatus(1)"
-              >立即上架</el-button>
+              <!-- 快捷上下架控制 (仅管理员可见) -->
+              <template v-if="authStore.isAdmin">
+                <el-button
+                  v-if="course.status === 1"
+                  type="warning"
+                  plain
+                  @click="handleToggleStatus(0)"
+                >下架</el-button>
+                <el-button
+                  v-else-if="course.status === 0"
+                  type="success"
+                  @click="handleToggleStatus(1)"
+                >上架</el-button>
+              </template>
             </template>
           </template>
         </div>

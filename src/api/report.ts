@@ -148,11 +148,14 @@ export const recalculateAllProfiles = (courseId: string | number) =>
 export const generateCourseReport = (courseId: string) =>
   post<string>(`/v1/reports/course/${courseId}/generate`)
 
+export const generateSchoolReport = (schoolId: string, startTime?: string, endTime?: string) =>
+  post<string>(`/v1/reports/school/${schoolId}/generate`, null, { params: { startTime, endTime } })
+
 export const getReportStatus = (reportId: string) =>
   silentGet<ReportStatusResponse>(`/v1/reports/${reportId}/status`)
 
-export const getReportDownloadUrl = (reportId: string) =>
-  get<string>(`/v1/reports/${reportId}/download`)
+export const getReportDownloadUrl = (reportId: string | number, reportType?: number) =>
+  get<string>(`/v1/reports/${reportId}/download`, { reportType })
 
 export const getCourseReportList = (courseId: string, params?: PageQuery) =>
   silentGet<PageResponse<ReportDTO>>(`/v1/reports/course/${courseId}`, params)
@@ -173,6 +176,9 @@ export const deleteReport = (reportId: string) =>
 
 export const getWeightsConfig = () =>
   get<Record<string, number>>('/v1/admin/config/weights')
+
+export const getDimensionNamesConfig = () =>
+  get<Record<string, string>>('/v1/admin/config/dimension-names')
 
 export const updateWeightsConfig = (data: Record<string, number>) =>
   put<void>('/v1/admin/config/weights', data)

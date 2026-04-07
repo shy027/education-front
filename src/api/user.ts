@@ -51,3 +51,7 @@ export const uploadFile = (file: File, folder = 'temp') => {
 /** 获取所有角色 */
 export const getAllRoles = () =>
   get<{ id: string; roleName: string; roleCode: string }[]>('/v1/roles/all')
+
+/** 下载用户导入模板 */
+export const downloadUserTemplate = () =>
+  get<Blob>('/v1/users/manage/template', {}, { responseType: 'blob' })

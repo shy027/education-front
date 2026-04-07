@@ -108,7 +108,7 @@
               <el-table-column label="操作" align="center" width="100">
                 <template #default="{ row }">
                   <el-button v-if="row.fileUrl" type="primary" size="small" class="red-btn" @click="handleDownloadDirect(row.fileUrl)">下载</el-button>
-                  <el-button v-else type="primary" size="small" class="red-btn" @click="handleDownloadReport(row.id)">下载</el-button>
+                  <el-button v-else type="primary" size="small" class="red-btn" @click="handleDownloadReport(row.id, row.reportType)">下载</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -216,8 +216,19 @@
           <!-- 校领导额外：学校报告区块 -->
           <div v-if="authStore.isSchoolLeader" class="section-group">
             <div class="group-title">
-              <el-icon><OfficeBuilding /></el-icon>
-              学校报告
+              <div class="title-left">
+                <el-icon><OfficeBuilding /></el-icon>
+                <span>学校报告</span>
+              </div>
+              <el-button 
+                type="primary" 
+                size="small" 
+                class="red-btn" 
+                :loading="schoolGenerating"
+                @click="handleGenerateSchoolReport"
+              >
+                生成全校报告
+              </el-button>
             </div>
             <div v-if="schoolReports.length === 0" class="school-report-empty">
               <el-empty description="暂无学校报告" :image-size="80" />
@@ -234,7 +245,7 @@
               </el-table-column>
               <el-table-column label="操作" align="center" width="100">
                 <template #default="{ row }">
-                  <el-button v-if="row.status === 2" text type="primary" size="small" @click="handleDownloadReport(row.id)">下载</el-button>
+                  <el-button v-if="row.status === 2" text type="primary" size="small" @click="handleDownloadReport(row.id, 2)">下载</el-button>
                 </template>
               </el-table-column>
             </el-table>
@@ -256,6 +267,41 @@
       </div>
     </div>
 
+    <!-- ===== 学校报告生成弹窗 ===== -->
+    <el-dialog
+      v-model="schoolReportDialogVisible"
+      title="生成全校思政建设报告"
+      width="460px"
+      destroy-on-close
+    >
+      <div class="dialog-content">
+        <p class="dialog-tip">请选择报告统计的时间范围，系统将聚合此期间内全校所有课程与学生的行为数据及素养评分。</p>
+        <el-form label-position="top">
+          <el-form-item label="统计周期">
+            <el-date-picker
+              v-model="reportDateRange"
+              type="daterange"
+              range-separator="至"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              :clearable="false"
+              style="width: 100%"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="schoolReportDialogVisible = false">取消</el-button>
+          <el-button type="primary" class="red-btn" :loading="schoolGenerating" @click="confirmGenerateSchoolReport">
+            开始生成
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
   </div>
 </template>
 
@@ -270,7 +316,7 @@ import type { MyCourseItem } from '@/api/course'
 import {
   getMyProfile, getRadarData, getGrowthTrack, getLearningStatistics,
   getUserProfile,
-  calculateMyProfile, generateCourseReport, getCourseReportList,
+  calculateMyProfile, generateCourseReport, generateSchoolReport, getCourseReportList,
   getReportDownloadUrl, getAllReportList,
 } from '@/api/report'
 import type { ProfileResponse, RadarDataResponse, StatisticsResponse, ReportDTO } from '@/api/report'
@@ -291,6 +337,9 @@ const listLoading = ref(false)
 const profileMap = ref<Record<string, ProfileResponse>>({})
 const latestReportMap = ref<Record<string, ReportDTO>>({})
 const schoolReports = ref<ReportDTO[]>([])
+const schoolGenerating = ref(false)
+const schoolReportDialogVisible = ref(false)
+const reportDateRange = ref<[string, string] | null>(null)
 
 // 课程卡片分页 (前端分页)
 const coursePageNum = ref(1)
@@ -480,6 +529,54 @@ async function handleGenerateReport() {
   } finally { generating.value = false }
 }
 
+// ──── 学校报告生成 ────
+let schoolReportPollTimer: number | null = null
+
+function handleGenerateSchoolReport() {
+  schoolGenerating.value = false
+  schoolReportDialogVisible.value = true
+  
+  // 默认填入近 30 天日期
+  const end = new Date()
+  const start = new Date()
+  start.setTime(start.getTime() - 3600 * 1000 * 24 * 30)
+  const fmt = (d: Date) => d.toISOString().split('T')[0]
+  reportDateRange.value = [fmt(start), fmt(end)]
+}
+
+async function confirmGenerateSchoolReport() {
+  if (!authStore.userInfo?.schoolId) {
+    ElMessage.error('无法获取学校信息，请重新登录')
+    return
+  }
+  if (!reportDateRange.value) {
+    ElMessage.error('请选择统计周期')
+    return
+  }
+
+  schoolGenerating.value = true
+  try {
+    const [start, end] = reportDateRange.value
+    await generateSchoolReport(String(authStore.userInfo.schoolId), start, end)
+    ElMessage.success('全校报告生成已开始')
+    schoolReportDialogVisible.value = false
+    
+    // 开始轮询学校报告列表
+    await fetchSchoolReports()
+    if (schoolReportPollTimer) clearInterval(schoolReportPollTimer)
+    schoolReportPollTimer = window.setInterval(async () => {
+      await fetchSchoolReports()
+      // 如果所有状态都不是 1 (生成中), 则关闭轮询
+      if (!schoolReports.value.some(r => r.status === 1)) {
+        clearInterval(schoolReportPollTimer!)
+        schoolReportPollTimer = null
+      }
+    }, 5000)
+  } finally {
+    schoolGenerating.value = false
+  }
+}
+
 function handleViewStudentLiteracy() {
   router.push({
     path: '/report/student-literacy',
@@ -487,9 +584,9 @@ function handleViewStudentLiteracy() {
   })
 }
 
-async function handleDownloadReport(id: string | number) {
+async function handleDownloadReport(id: string | number, type?: number) {
   try {
-    const url = await getReportDownloadUrl(String(id))
+    const url = await getReportDownloadUrl(String(id), type)
     const a = document.createElement('a')
     a.href = url; a.download = `报告_${new Date().toLocaleDateString()}.pdf`; a.click()
   } catch { /* 统一错误处理 */ }
@@ -592,6 +689,26 @@ onMounted(async () => {
   if (userId) {
     if (userName) targetUserName.value = String(userName)
     await openDetailForStudent(String(userId), String(courseId || '0'))
+  } else if (courseId) {
+    // 教师/管理员：直接进入特定课程报告详情
+    listLoading.value = true
+    try {
+      // 通过 API 获取课程列表并匹配
+      const res = await getMyCourses()
+      const allCourses = authStore.isStudent ? (res.learning ?? []) : (res.teaching ?? [])
+      const target = allCourses.find(c => String(c.courseId) === String(courseId) || String(c.id) === String(courseId))
+      
+      if (target) {
+        await openDetail(target)
+      } else {
+        // 如果没找到（可能是校领导看全站课程），则尝试获取简单列表数据
+        fetchListData()
+      }
+    } catch (e) {
+      fetchListData()
+    } finally {
+      listLoading.value = false
+    }
   } else {
     fetchListData()
   }
@@ -599,6 +716,7 @@ onMounted(async () => {
 })
 onUnmounted(() => {
   if (reportPollTimer) clearInterval(reportPollTimer)
+  if (schoolReportPollTimer) clearInterval(schoolReportPollTimer)
   radarChart?.dispose(); lineChart?.dispose()
   window.removeEventListener('resize', onResize)
 })
@@ -616,11 +734,12 @@ onUnmounted(() => {
 /* ===== 分组标题 ===== */
 .section-group { display: flex; flex-direction: column; gap: 14px; }
 .group-title {
-  display: flex; align-items: center; gap: 8px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
   font-size: 15px; font-weight: 700; color: #455a64;
   padding-bottom: 8px; border-bottom: 2px solid #ffcdd2;
   margin-bottom: 4px;
 }
+.title-left { display: flex; align-items: center; gap: 8px; }
 .group-title .el-icon { color: #d32f2f; font-size: 18px; }
 
 /* ===== 课程报告卡片 ===== */
@@ -732,4 +851,9 @@ onUnmounted(() => {
 }
 .orange-btn { background-color: #f57c00 !important; border-color: #f57c00 !important; margin-left: 10px; }
 .orange-btn:hover { opacity: 0.9; }
+
+/* ===== 弹窗样式 ===== */
+.dialog-content { padding: 0 10px; }
+.dialog-tip { font-size: 13px; color: #78909c; line-height: 1.6; margin-bottom: 20px; }
+.dialog-footer { display: flex; justify-content: flex-end; gap: 12px; }
 </style>

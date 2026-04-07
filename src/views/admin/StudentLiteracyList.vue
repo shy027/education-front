@@ -45,8 +45,8 @@
             <el-option v-for="c in classOptions" :key="c" :label="c" :value="c" />
           </el-select>
         </el-form-item>
-        <el-form-item label="课程范围">
-          <el-select v-model="query.courseId" placeholder="全部课程" :disabled="isCourseView" style="width: 160px">
+        <el-form-item label="课程范围" v-if="!isCourseView">
+          <el-select v-model="query.courseId" placeholder="全部课程" style="width: 160px">
             <el-option label="全站/全局" value="0" />
             <el-option 
               v-for="c in courseOptions" 
@@ -105,9 +105,16 @@
           </template>
         </el-table-column>
 
-        <el-table-column v-for="i in 6" :key="i" :label="'D'+i" width="70" align="center">
+        <el-table-column 
+          v-for="dim in activeDimensions" 
+          :key="dim.key" 
+          :label="dim.name" 
+          min-width="100" 
+          align="center"
+          show-overflow-tooltip
+        >
           <template #default="{ row }">
-            <span class="dim-score">{{ row['dimension' + i + 'Score'] }}</span>
+            <span class="dim-score">{{ row[dim.key + 'Score'] ?? 0 }}</span>
           </template>
         </el-table-column>
 
@@ -146,7 +153,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { Search, Refresh, ArrowLeft } from '@element-plus/icons-vue'
 import { computed } from 'vue'
-import { getProfileList } from '@/api/report'
+import { getProfileList, getDimensionNamesConfig } from '@/api/report'
 import { getSchoolList, getDepartments, getClasses } from '@/api/school'
 import { getPublishedCourses } from '@/api/course'
 import { batchGetUsers } from '@/api/user'
@@ -174,6 +181,14 @@ const schoolList = ref<any[]>([])
 const departmentOptions = ref<string[]>([])
 const classOptions = ref<string[]>([])
 const userMap = ref<Record<string, any>>({})
+const dimensionNames = ref<Record<string, string>>({})
+
+const activeDimensions = computed(() => {
+  return Object.entries(dimensionNames.value)
+    .filter(([_, name]) => !!name) // 仅保留有名称的
+    .map(([key, name]) => ({ key, name }))
+    .sort((a, b) => a.key.localeCompare(b.key)) // 按 D1, D2 排序
+})
 
 // ───── 加载数据 ─────
 async function fetchList() {
@@ -286,6 +301,18 @@ onMounted(async () => {
   fetchList()
   fetchSchools()
   fetchCourses()
+
+  // 加载维度名称配置
+  try {
+    const names = await getDimensionNamesConfig()
+    dimensionNames.value = names || {}
+  } catch (e) {
+    console.error('获取维度配置失败', e)
+    // 降级兜底
+    dimensionNames.value = { 
+      dimension1: 'D1', dimension2: 'D2', dimension3: 'D3', dimension4: 'D4', dimension5: 'D5' 
+    }
+  }
 })
 </script>
 

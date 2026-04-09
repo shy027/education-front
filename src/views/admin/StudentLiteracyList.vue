@@ -218,7 +218,7 @@ function handleSearch() {
 function handleReset() {
   query.current = 1
   query.size = 10
-  query.courseId = '0'
+  query.courseId = isCourseView.value ? String(route.query.courseId) : '0'
   query.schoolId = (authStore.isSchoolLeader && authStore.userInfo?.schoolId) 
     ? String(authStore.userInfo.schoolId) 
     : undefined

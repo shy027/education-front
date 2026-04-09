@@ -75,27 +75,25 @@
           <div class="upload-tip">建议尺寸 720×480，支持 jpg/png/webp，≤5MB</div>
         </el-form-item>
 
-        <!-- 文章：正文（富文本编辑器） -->
-        <el-form-item v-if="form.resourceType === 1" label="正文内容" class="editor-form-item">
-          <div class="editor-wrapper">
-            <Toolbar
-              style="border-bottom: 1px solid #e0e0e0"
-              :editor="editorRef"
-              :defaultConfig="toolbarConfig"
-              mode="default"
-            />
-            <Editor
-              style="height: 500px; overflow-y: hidden;"
-              v-model="form.content"
-              :defaultConfig="editorConfig"
-              mode="default"
-              @onCreated="handleCreated"
-            />
-          </div>
+        <!-- 挂图上传（多图） -->
+        <el-form-item v-if="form.resourceType === 5" label="挂图图片" prop="attachments">
+          <el-upload
+            v-model:file-list="imageFileList"
+            list-type="picture-card"
+            :http-request="handleCustomImageUpload"
+            :on-remove="handleRemoveImage"
+            :limit="9"
+            accept="image/*"
+          >
+            <el-icon><Plus /></el-icon>
+            <template #tip>
+              <div class="upload-tip">最多支持 9 张图片，支持 jpg/png/webp</div>
+            </template>
+          </el-upload>
         </el-form-item>
 
-        <!-- 文件上传（视频/文档/音频） -->
-        <el-form-item v-if="form.resourceType !== 1" label="资源文件" prop="fileUrl">
+        <!-- 文件上传（动画/视频/文档/音频） -->
+        <el-form-item v-if="form.resourceType !== 5" label="资源文件" prop="fileUrl">
           <el-upload
             v-if="!form.fileUrl"
             :show-file-list="false"
@@ -162,10 +160,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, markRaw, onMounted, onBeforeUnmount, shallowRef } from 'vue'
-import '@wangeditor/editor/dist/css/style.css'
-import { Editor, Toolbar } from '@wangeditor/editor-for-vue'
-import { IDomEditor, IEditorConfig, IToolbarConfig } from '@wangeditor/editor'
+import { ref, reactive, computed, markRaw, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules, UploadRawFile } from 'element-plus'
@@ -189,25 +184,28 @@ const isEdit = computed(() => !!resourceId.value)
 
 // ─── 资源类型 ───
 const RESOURCE_TYPES = [
-  { label: '文章', value: 1, icon: markRaw(Reading), color: '#d32f2f' },
+  { label: '动画', value: 1, icon: markRaw(VideoPlay), color: '#9c27b0' },
   { label: '视频', value: 2, icon: markRaw(VideoPlay), color: '#1976d2' },
   { label: '文档', value: 3, icon: markRaw(Document), color: '#388e3c' },
   { label: '音频', value: 4, icon: markRaw(Headset), color: '#f57c00' },
+  { label: '挂图', value: 5, icon: markRaw(Reading), color: '#0097a7' },
 ]
 
 const typeIconMap: Record<number, ReturnType<typeof markRaw>> = {
-  1: markRaw(Reading), 2: markRaw(VideoPlay), 3: markRaw(Document), 4: markRaw(Headset),
+  1: markRaw(VideoPlay), 2: markRaw(VideoPlay), 3: markRaw(Document), 4: markRaw(Headset), 5: markRaw(Reading),
 }
 
 const fileAccept = computed(() => {
-  return { 2: 'video/*', 3: '.pdf', 4: 'audio/*' }[form.resourceType] ?? ''
+  return { 1: 'video/*', 2: 'video/*', 3: '.pdf', 4: 'audio/*', 5: 'image/*' }[form.resourceType] ?? ''
 })
 
 const fileTypeTip = computed(() => {
   return {
+    1: '支持 mp4/avi/mov，建议 ≤500MB',
     2: '支持 mp4/avi/mov，建议 ≤500MB',
     3: '仅支持 PDF 格式，建议 ≤50MB',
     4: '支持 mp3/m4a/wav，建议 ≤100MB',
+    5: '支持 jpg/png/webp，最多 9 张',
   }[form.resourceType] ?? ''
 })
 
@@ -217,39 +215,6 @@ const submitting = ref(false)
 const uploadProgress = ref(0)
 const selectedCategory = ref<string | undefined>(undefined)
 
-// ─── 富文本编辑器配置 ───
-const editorRef = shallowRef<IDomEditor>()
-const toolbarConfig: Partial<IToolbarConfig> = {
-  excludeKeys: ['fullScreen']
-}
-const editorConfig: Partial<IEditorConfig> = {
-  placeholder: '请输入文章正文...',
-  MENU_CONF: {
-    uploadImage: {
-      // 自定义上传
-      async customUpload(file: File, insertFn: any) {
-        try {
-          const res = await uploadResourceImage(file)
-          insertFn(res.fileUrl, res.fileName, res.fileUrl)
-        } catch (err) {
-          ElMessage.error('图片插入失败')
-        }
-      }
-    }
-  }
-}
-
-const handleCreated = (editor: IDomEditor) => {
-  editorRef.value = editor
-}
-
-// 组件销毁时，及时销毁编辑器
-onBeforeUnmount(() => {
-  const editor = editorRef.value
-  if (editor == null) return
-  editor.destroy()
-})
-
 const form = reactive<ResourceCreateReq & { resourceType: number }>({
   title: '',
   summary: '',
@@ -257,9 +222,33 @@ const form = reactive<ResourceCreateReq & { resourceType: number }>({
   coverUrl: '',
   categoryId: undefined,
   tagIds: [],
-  resourceType: 1,
+  resourceType: 2, // 默认视频
   fileUrl: '',
 })
+
+// ─── 挂图多图上传 ───
+const imageFileList = ref<any[]>([])
+
+async function handleCustomImageUpload(options: any) {
+  try {
+    const res = await uploadResourceImage(options.file)
+    // 找到当前上传的文件对象并更新其 URL
+    const fileItem = imageFileList.value.find(item => item.uid === options.file.uid)
+    if (fileItem) {
+      fileItem.url = res.fileUrl
+      fileItem.name = res.fileName
+      fileItem.status = 'success'
+    }
+  } catch (err) {
+    ElMessage.error('图片上传失败')
+    options.onError(err)
+  }
+}
+
+const handleRemoveImage = (file: any) => {
+  const index = imageFileList.value.findIndex(item => item.uid === file.uid)
+  if (index > -1) imageFileList.value.splice(index, 1)
+}
 
 const rules: FormRules = {
   title: [
@@ -272,7 +261,7 @@ const rules: FormRules = {
   fileUrl: [
     {
       validator: (_: unknown, v: string, cb: (err?: Error) => void) => {
-        if (form.resourceType !== 1 && !v) cb(new Error('请上传资源文件'))
+        if (form.resourceType !== 5 && !v) cb(new Error('请上传资源文件'))
         else cb()
       },
       trigger: 'change',
@@ -299,7 +288,7 @@ async function handleFileUpload(file: UploadRawFile) {
   uploadProgress.value = 10
   try {
     let url = ''
-    if (form.resourceType === 2) {
+    if (form.resourceType === 1 || form.resourceType === 2) {
       const res = await uploadResourceVideo(file)
       url = res.fileUrl
     } else if (form.resourceType === 4) {
@@ -322,16 +311,22 @@ async function fetchResourceDetail() {
   submitting.value = true
   try {
     const data = await getResourceDetail(resourceId.value as any)
-    // 后端返回的是 ResourceDetailResponse，需要映射到 ResourceCreateReq
     form.title = data.title
     form.summary = data.summary || ''
-    form.content = data.content || ''
-    form.coverUrl = data.coverUrl || ''
-    form.categoryId = data.categoryId
     form.resourceType = data.resourceType
-    form.fileUrl = data.attachments?.[0]?.fileUrl || ''
+    form.coverUrl = data.coverUrl || ''
+    if (data.resourceType === 5) {
+      imageFileList.value = data.attachments?.map(a => ({
+        name: a.fileName,
+        url: a.fileUrl,
+        uid: a.id
+      })) || []
+    } else {
+      form.fileUrl = data.attachments?.[0]?.fileUrl || ''
+    }
     form.tagIds = data.tags?.map(t => t.id) || []
     selectedCategory.value = data.categoryId
+    form.categoryId = data.categoryId
   } catch (err) {
     ElMessage.error('获取资源详情失败')
     router.push('/resource')
@@ -349,12 +344,21 @@ async function handleSubmit(mode: 'draft' | 'publish') {
     const payload: any = {
       title: form.title,
       summary: form.summary || undefined,
-      content: form.content || undefined,
       coverUrl: form.coverUrl || undefined,
       categoryId: form.categoryId,
       tagIds: form.tagIds?.length ? form.tagIds : undefined,
       resourceType: form.resourceType,
-      fileUrl: form.fileUrl || undefined,
+    }
+
+    if (form.resourceType === 5) {
+      payload.attachments = imageFileList.value.map((img, index) => ({
+        fileName: img.name,
+        fileUrl: img.url,
+        sortOrder: index,
+        fileType: 'image'
+      }))
+    } else {
+      payload.fileUrl = form.fileUrl || undefined
     }
     
     let id: any = resourceId.value
@@ -376,6 +380,8 @@ async function handleSubmit(mode: 'draft' | 'publish') {
       ElMessage.success('草稿已保存')
     }
     router.push(`/resource/${id}`)
+  } catch (err) {
+    ElMessage.error('发布失败')
   } finally { submitting.value = false }
 }
 
@@ -475,10 +481,11 @@ onMounted(async () => {
 }
 .preview-cover img { width: 100%; height: 100%; object-fit: cover; }
 
-.bg-type-1 { background: linear-gradient(135deg, #b71c1c, #ff5252); }
+.bg-type-1 { background: linear-gradient(135deg, #7b1fa2, #ba68c8); }
 .bg-type-2 { background: linear-gradient(135deg, #1565c0, #42a5f5); }
 .bg-type-3 { background: linear-gradient(135deg, #2e7d32, #66bb6a); }
 .bg-type-4 { background: linear-gradient(135deg, #e65100, #ffa726); }
+.bg-type-5 { background: linear-gradient(135deg, #00838f, #00bcd4); }
 
 .preview-info { padding: 12px; }
 .preview-name    { font-size: 14px; font-weight: 700; color: #263238; margin-bottom: 4px; }

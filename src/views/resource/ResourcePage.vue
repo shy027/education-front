@@ -9,7 +9,7 @@
         <div class="banner-search">
           <el-input
             v-model="query.keyword"
-            placeholder="搜索资源名称、作者..."
+            placeholder="搜索资源名称..."
             :prefix-icon="Search"
             clearable
             size="large"
@@ -24,21 +24,6 @@
 
     <!-- ===== 内容区 ===== -->
     <div class="page-body">
-
-      <!-- 类型 Tab -->
-      <div class="type-tabs">
-        <button
-          v-for="t in TYPE_TABS"
-          :key="t.value"
-          class="type-tab"
-          :class="{ active: activeType === t.value }"
-          @click="switchType(t.value)"
-        >
-          <el-icon class="tab-icon"><component :is="t.icon" /></el-icon>
-          {{ t.label }}
-          <span v-if="t.value === activeType" class="tab-bar" />
-        </button>
-      </div>
 
       <!-- 筛选区 -->
       <div class="filter-row">
@@ -100,6 +85,21 @@
             @click="$router.push('/resource/create')"
           >发布资源</el-button>
         </div>
+      </div>
+
+      <!-- 类型 Tab -->
+      <div class="type-tabs">
+        <button
+          v-for="t in TYPE_TABS"
+          :key="t.value"
+          class="type-tab"
+          :class="{ active: activeType === t.value }"
+          @click="switchType(t.value)"
+        >
+          <el-icon class="tab-icon"><component :is="t.icon" /></el-icon>
+          {{ t.label }}
+          <span v-if="t.value === activeType" class="tab-bar" />
+        </button>
       </div>
 
       <!-- 资源卡片网格 -->
@@ -195,10 +195,11 @@ const authStore = useAuthStore()
 // ─── 类型 Tab ───
 const TYPE_TABS = [
   { label: '全部', value: 0, icon: markRaw(Reading) },
-  { label: '文章', value: 1, icon: markRaw(Document) },
+  { label: '动画', value: 1, icon: markRaw(VideoPlay) },
   { label: '视频', value: 2, icon: markRaw(VideoPlay) },
   { label: '文档', value: 3, icon: markRaw(Document) },
   { label: '音频', value: 4, icon: markRaw(Headset) },
+  { label: '挂图', value: 5, icon: markRaw(Reading) },
 ]
 const activeType = ref(0)
 
@@ -210,8 +211,8 @@ function switchType(val: number) {
 }
 
 // ─── 类型辅助 ───
-function typeIcon(t: number) { return { 1: markRaw(Document), 2: markRaw(VideoPlay), 3: markRaw(Document), 4: markRaw(Headset) }[t] ?? markRaw(Document) }
-function typeLabel(t: number): string { return { 1: '文章', 2: '视频', 3: '文档', 4: '音频' }[t] ?? '资源' }
+function typeIcon(t: number) { return { 1: markRaw(VideoPlay), 2: markRaw(VideoPlay), 3: markRaw(Document), 4: markRaw(Headset), 5: markRaw(Reading) }[t] ?? markRaw(Document) }
+function typeLabel(t: number): string { return { 1: '动画', 2: '视频', 3: '文档', 4: '音频', 5: '挂图' }[t] ?? '资源' }
 
 // ─── 查询参数 ───
 const query = reactive<ResourceQuery & { resourceType?: number }>({
@@ -405,10 +406,11 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-.bg-type-1 { background: linear-gradient(135deg, #b71c1c 0%, #d32f2f 50%, #ff5252 100%); }
+.bg-type-1 { background: linear-gradient(135deg, #7b1fa2 0%, #9c27b0 50%, #ba68c8 100%); }
 .bg-type-2 { background: linear-gradient(135deg, #1565c0 0%, #1976d2 60%, #42a5f5 100%); }
 .bg-type-3 { background: linear-gradient(135deg, #2e7d32 0%, #388e3c 60%, #66bb6a 100%); }
 .bg-type-4 { background: linear-gradient(135deg, #e65100 0%, #f57c00 60%, #ffa726 100%); }
+.bg-type-5 { background: linear-gradient(135deg, #00838f 0%, #0097a7 60%, #00bcd4 100%); }
 
 .cover-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.4s; }
 .resource-card:hover .cover-img { transform: scale(1.05); }

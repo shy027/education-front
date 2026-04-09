@@ -164,7 +164,7 @@ import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { Plus, Search, Reading, User, UserFilled, DataAnalysis } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
-import { getCourseList, getMyCourses, joinCourse, createCourse } from '@/api/course'
+import { getCourseList, getMyCourses, joinCourse, createCourse, getPublishedCourses } from '@/api/course'
 import type { CourseItem, CourseCreateReq } from '@/api/course'
 import { getAllEnabledSubjects } from '@/api/subject'
 
@@ -291,14 +291,41 @@ async function fetchList() {
       const end = start + query.pageSize
       courseList.value = filteredList.slice(start, end)
     } else {
-      query.keyword = searchKeyword.value
-      const res = await getCourseList({
-        ...query,
-        subjectArea: query.subjectArea || undefined,
-        auditStatus: 1, // 前台课程中心只显示审核通过的
-      })
-      courseList.value = res.list || res.records || []
-      total.value = res.total || 0
+      // 全部课程标签页
+      if (authStore.isSchoolLeader && (query.status === undefined || query.status === null)) {
+        // 校领导在全部课程下，默认仅显示“进行中”和“暂未开放”，此处改为客户端分页模式以解决分页数量不准确的老问题
+        const rawList = await getPublishedCourses()
+        const list = rawList.map(c => ({
+          ...c,
+          id: String(c.id)
+        }))
+        
+        // 客户端过滤
+        const kw = searchKeyword.value.trim().toLowerCase()
+        let filteredList = list.filter(c => {
+          const s = getCalculatedStatus(c)
+          const isTargetStatus = (s === 'ongoing' || s === 'notStarted')
+          const matchesKeyword = !kw || c.courseName.toLowerCase().includes(kw)
+          const matchesSubject = !query.subjectArea || c.subjectArea === query.subjectArea
+          const matchesJoinType = !query.joinType || c.joinType === query.joinType
+          return isTargetStatus && matchesKeyword && matchesSubject && matchesJoinType
+        })
+
+        total.value = filteredList.length
+        const start = (query.pageNum - 1) * query.pageSize
+        const end = start + query.pageSize
+        courseList.value = filteredList.slice(start, end)
+      } else {
+        // 传统服务端分页模式
+        query.keyword = searchKeyword.value
+        const res = await getCourseList({
+          ...query,
+          subjectArea: query.subjectArea || undefined,
+          auditStatus: 1,
+        })
+        courseList.value = res.list || res.records || []
+        total.value = res.total || 0
+      }
     }
   } finally {
     loading.value = false

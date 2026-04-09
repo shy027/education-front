@@ -55,68 +55,68 @@
           </div>
         </div>
 
-        <!-- 精简后的资源详情 (仅文章显示且有内容) -->
-        <el-card v-if="resource.resourceType === 1" class="content-card" shadow="never">
+        <!-- 在线预览区 / 挂图展示区 -->
+        <el-card v-if="previewUrl || resource.resourceType === 5" class="preview-card" shadow="never">
           <template #header>
             <div class="card-header">
-              <h3>资源详情</h3>
+              <h3>内容展示：{{ resource.title }}</h3>
             </div>
           </template>
-          <!-- 富文本内容 -->
-          <div
-            v-if="resource.content"
-            class="resource-content"
-            v-html="formattedContent"
-          />
-          <el-empty v-else description="该资源暂无正文内容" :image-size="80" />
-        </el-card>
-
-        <!-- 在线预览区 (已移除附件列表，直接显示预览) -->
-        <el-card v-if="previewUrl && resource.resourceType !== 1" class="preview-card" shadow="never">
-          <template #header>
-            <div class="card-header">
-              <h3>正在学习：{{ currentFile?.fileName || resource.title }}</h3>
-            </div>
-          </template>
-          <div class="media-previewer">
-            <!-- 视频播放 -->
-            <video
-              v-if="previewType === 'video'"
-              :key="previewUrl"
-              :src="previewUrl"
-              controls
-              autoplay
-              class="video-player"
-              @play="trackView"
-            />
-            <!-- PDF 预览 (使用 PDF.js 渲染库) -->
-            <div v-else-if="previewType === 'pdf'" ref="pdfContainer" class="pdf-viewer-container">
-              <vue-pdf-embed 
-                v-if="pdfSource" 
-                :source="pdfSource" 
-                :width="containerWidth > 0 ? containerWidth : undefined"
-                class="pdf-render" 
+          <div class="media-previewer" :class="{ 'gallery-mode': resource.resourceType === 5 }">
+            <!-- 挂图模式：多图画廊 -->
+            <div v-if="resource.resourceType === 5" class="image-gallery">
+              <el-image
+                v-for="(img, idx) in resource.attachments"
+                :key="img.id"
+                :src="img.fileUrl"
+                :preview-src-list="resource.attachments.map(a => a.fileUrl)"
+                :initial-index="idx"
+                fit="cover"
+                class="gallery-item"
               />
-              <div v-else v-loading="loadingPdf" class="pdf-loading">正在加载文档流...</div>
             </div>
-            <!-- Office 预览 -->
-            <iframe
-              v-else-if="previewType === 'office'"
-              :src="previewUrl"
-              class="doc-viewer"
-              frameborder="0"
-              allowfullscreen
-            ></iframe>
-            <!-- 音频播放 -->
-            <div v-else-if="previewType === 'audio'" class="audio-preview-wrap">
-              <el-icon :size="80" class="audio-icon"><Headset /></el-icon>
-              <audio ref="audioRef" :key="previewUrl" :src="previewUrl" controls class="audio-player" @play="trackView" />
-              <div class="playing-hint">正在播放音频：{{ currentFile?.fileName || resource.title }}</div>
-            </div>
-            <!-- 其它 -->
-            <div v-else class="stage-fallback">
-              <el-icon :size="100" color="rgba(0,0,0,0.1)"><component :is="typeIcon(resource.resourceType)" /></el-icon>
-            </div>
+
+            <!-- 常规媒体预览 -->
+            <template v-else>
+              <!-- 视频播放 -->
+              <video
+                v-if="previewType === 'video'"
+                :key="previewUrl"
+                :src="previewUrl"
+                controls
+                autoplay
+                class="video-player"
+                @play="trackView"
+              />
+              <!-- PDF 预览 -->
+              <div v-else-if="previewType === 'pdf'" ref="pdfContainer" class="pdf-viewer-container">
+                <vue-pdf-embed 
+                  v-if="pdfSource" 
+                  :source="pdfSource" 
+                  :width="containerWidth > 0 ? containerWidth : undefined"
+                  class="pdf-render" 
+                />
+                <div v-else v-loading="loadingPdf" class="pdf-loading">正在加载文档流...</div>
+              </div>
+              <!-- Office 预览 -->
+              <iframe
+                v-else-if="previewType === 'office'"
+                :src="previewUrl"
+                class="doc-viewer"
+                frameborder="0"
+                allowfullscreen
+              ></iframe>
+              <!-- 音频播放 -->
+              <div v-else-if="previewType === 'audio'" class="audio-preview-wrap">
+                <el-icon :size="80" class="audio-icon"><Headset /></el-icon>
+                <audio ref="audioRef" :key="previewUrl" :src="previewUrl" controls class="audio-player" @play="trackView" />
+                <div class="playing-hint">正在播放音频：{{ currentFile?.fileName || resource.title }}</div>
+              </div>
+              <!-- 其它 -->
+              <div v-else class="stage-fallback">
+                <el-icon :size="100" color="rgba(0,0,0,0.1)"><component :is="typeIcon(resource.resourceType)" /></el-icon>
+              </div>
+            </template>
           </div>
         </el-card>
 
@@ -158,7 +158,7 @@ import VuePdfEmbed from 'vue-pdf-embed'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft, View, User, Clock, Download, Edit, Headset,
-  VideoPlay, Document,
+  VideoPlay, Document, Reading,
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -190,8 +190,8 @@ const canEdit = computed(() => {
   return isAdmin || isCreator
 })
 
-function typeIcon(t: number) { return { 1: markRaw(Document), 2: markRaw(VideoPlay), 3: markRaw(Document), 4: markRaw(Headset) }[t] ?? markRaw(Document) }
-function typeLabel(t: number): string { return { 1: '文章', 2: '视频', 3: '文档', 4: '音频' }[t] ?? '资源' }
+function typeIcon(t: number) { return { 1: markRaw(VideoPlay), 2: markRaw(VideoPlay), 3: markRaw(Document), 4: markRaw(Headset), 5: markRaw(Reading) }[t] ?? markRaw(Document) }
+function typeLabel(t: number): string { return { 1: '动画', 2: '视频', 3: '文档', 4: '音频', 5: '挂图' }[t] ?? '资源' }
 
 const selectedAttachIdx = ref(0) // 默认开启首个附件预览
 
@@ -268,9 +268,10 @@ const previewType = computed(() => {
   const fileName = file.fileName?.toLowerCase() || ''
   const pureUrl = file.fileUrl.split('?')[0].toLowerCase()
 
-  if (pureUrl.endsWith('.mp4') || pureUrl.endsWith('.webm')) return 'video'
-  if (pureUrl.endsWith('.mp3') || pureUrl.endsWith('.wav')) return 'audio'
-  if (fileName.endsWith('.pdf') || pureUrl.endsWith('.pdf')) return 'pdf'
+  if (file.fileType === 'video' || pureUrl.endsWith('.mp4') || pureUrl.endsWith('.webm') || resource.value?.resourceType === 1) return 'video'
+  if (file.fileType === 'audio' || pureUrl.endsWith('.mp3') || pureUrl.endsWith('.wav')) return 'audio'
+  if (file.fileType === 'pdf' || fileName.endsWith('.pdf') || pureUrl.endsWith('.pdf')) return 'pdf'
+  if (file.fileType === 'image' || pureUrl.endsWith('.jpg') || pureUrl.endsWith('.png') || pureUrl.endsWith('.webp')) return 'image'
   if (previewUrl.value.includes('officeapps.live.com')) return 'office'
 
   return 'none'
@@ -381,10 +382,11 @@ onMounted(async () => {
   border-radius: 12px; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
 }
-.bg-type-1 { background: linear-gradient(135deg, #b71c1c, #ff5252); }
+.bg-type-1 { background: linear-gradient(135deg, #7b1fa2, #ba68c8); }
 .bg-type-2 { background: linear-gradient(135deg, #1565c0, #42a5f5); }
 .bg-type-3 { background: linear-gradient(135deg, #2e7d32, #66bb6a); }
 .bg-type-4 { background: linear-gradient(135deg, #e65100, #ffa726); }
+.bg-type-5 { background: linear-gradient(135deg, #00838f, #00bcd4); }
 
 .cover-img { width: 100%; height: 100%; object-fit: cover; }
 .media-fallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
@@ -393,10 +395,11 @@ onMounted(async () => {
 
 .type-badge-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
 .type-badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 12px; }
-.type-1 { background: #ffebee; color: #d32f2f; }
+.type-1 { background: #f3e5f5; color: #7b1fa2; }
 .type-2 { background: #e3f2fd; color: #1976d2; }
 .type-3 { background: #e8f5e9; color: #388e3c; }
 .type-4 { background: #fff3e0; color: #f57c00; }
+.type-5 { background: #e0f7fa; color: #00838f; }
 
 .resource-title { margin: 0 0 10px; font-size: 22px; font-weight: 800; color: #1a1a1a; line-height: 1.4; }
 .resource-summary { margin: 0 0 14px; font-size: 14px; color: #546e7a; line-height: 1.7; }
@@ -413,26 +416,31 @@ onMounted(async () => {
 .preview-card { border-radius: 14px !important; margin-bottom: 16px; overflow: hidden; }
 :deep(.preview-card .el-card__body) { padding: 0; }
 
-.media-previewer {
+.media-previewer.gallery-mode { height: auto; min-height: 400px; background: #fafafa; padding: 20px; }
+.image-gallery { display: flex; flex-direction: column; align-items: center; gap: 24px; width: 100%; }
+.gallery-item {
   width: 100%;
-  height: 950px;
-  background: #f5f5f5;
-  /* 移除 flex 居中，防止子容器收缩 */
-  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  cursor: zoom-in;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  transition: transform 0.2s;
 }
+.gallery-item:hover { transform: translateY(-2px); }
 
 .video-player { width: 100%; height: 100%; max-height: 600px; background: #000; }
 .doc-viewer { width: 100%; height: 100%; border: none; background: #fff; }
 
 .audio-preview-wrap {
-  display: flex; flex-direction: column; align-items: center; gap: 20px;
-  padding: 40px; width: 100%; max-width: 500px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px;
+  padding: 40px; height: 100%;
 }
 .audio-icon { color: #90a4ae; opacity: 0.3; }
-.audio-player { width: 100%; }
+.audio-player { width: 100%; max-width: 500px; }
 .playing-hint { font-size: 14px; color: #90a4ae; }
 
-.stage-fallback { opacity: 0.5; }
+.stage-fallback { display: flex; align-items: center; justify-content: center; height: 100%; opacity: 0.5; }
 
 /* 附件卡片 */
 .attachments-card { border-radius: 14px !important; margin-top: 4px; }

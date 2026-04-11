@@ -270,7 +270,7 @@
         <div v-loading="taskLoading">
           <div class="tab-toolbar">
             <span class="toolbar-total">共 {{ tasks.length }} 项任务</span>
-            <el-button v-if="isMyTeaching && !isCourseFinished" type="primary" :icon="Plus" size="small" class="red-sm-btn" @click="showCreateTaskDialog = true">
+            <el-button v-if="isMyTeaching && !isCourseFinished" type="primary" :icon="Plus" size="small" class="red-sm-btn" @click="routerInstance.push(`/course/${courseId}/paper-composer/new`)">
               创建任务
             </el-button>
           </div>
@@ -289,15 +289,28 @@
                 </div>
               </div>
               <div class="task-actions">
-                <el-tag v-if="!isMyTeaching" size="small">{{ t.submitCount }} 人参与</el-tag>
-                <el-button v-if="isMyTeaching && !isCourseFinished" text type="danger" size="small" @click="deleteTaskById(t.id)">删除</el-button>
-                <!-- 临时测试功能：学生手动完成任务 -->
-                <el-button 
-                  v-if="!isMyTeaching && isMember && !isCourseFinished" 
-                  type="success" 
-                  size="small" 
-                  @click="handleCompleteTestTask(t)"
-                >完成 (测试)</el-button>
+                <el-tag v-if="!isMyTeaching && t.status !== 0" size="small">{{ t.submitCount }} 人参与</el-tag>
+                
+                <!-- 教师视图 -->
+                <template v-if="isMyTeaching && !isCourseFinished">
+                  <!-- 所有任务类型初始均为草稿状态，均需点击去组卷/发布 -->
+                  <el-button v-if="t.status === 0" type="primary" size="small" @click="openPaperComposer(t)">去组卷/发布</el-button>
+                  
+                  <!-- 发布后的任务可以查看批改/考情 -->
+                  <el-button v-if="t.status === 1" type="success" plain size="small" @click="openGradingPanel(t)">批改/考情</el-button>
+                  
+                  <el-button text type="danger" size="small" @click="deleteTaskById(t.id)">删除</el-button>
+                </template>
+
+                <!-- 学生视图 -->
+                <template v-if="!isMyTeaching && isMember && !isCourseFinished">
+                  <el-button v-if="t.status === 1 && (t.taskType === 2 || t.taskType === 3)" type="primary" size="small" @click="startExamTask(t)">
+                    参加考试
+                  </el-button>
+                  <el-button v-if="t.taskType === 1" type="success" size="small" @click="handleCompleteTestTask(t)">
+                    完成(测试作业)
+                  </el-button>
+                </template>
               </div>
             </div>
           </div>
@@ -752,51 +765,7 @@
       </template>
     </el-dialog>
 
-    <!-- 创建任务对话框 -->
-    <el-dialog v-model="showCreateTaskDialog" title="创建学习任务" width="520px" @closed="resetTaskForm">
-      <el-form :model="taskForm" label-width="80px" size="large">
-        <el-form-item label="任务名称" required>
-          <el-input v-model="taskForm.taskTitle" placeholder="如：第一章课后测试" clearable />
-        </el-form-item>
-        <el-form-item label="任务类型" required>
-          <el-select v-model="taskForm.taskType" placeholder="选择任务类型" style="width: 100%">
-            <el-option label="作业" :value="1" />
-            <el-option label="测验" :value="2" />
-            <el-option label="考试" :value="3" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="满分设置">
-          <el-input-number v-model="taskForm.totalScore" :min="0" :max="100" />
-        </el-form-item>
-        <template v-if="taskForm.taskType !== 1">
-          <el-form-item label="开始时间" required>
-            <el-date-picker
-              v-model="taskForm.startTime"
-              type="datetime"
-              placeholder="选择测试/考试开始时间"
-              value-format="YYYY-MM-DD HH:mm:ss"
-              style="width: 100%"
-            />
-          </el-form-item>
-          <el-form-item label="截止时间" required>
-            <el-date-picker
-              v-model="taskForm.endTime"
-              type="datetime"
-              placeholder="选择测试/考试截止时间"
-              value-format="YYYY-MM-DD HH:mm:ss"
-              style="width: 100%"
-            />
-          </el-form-item>
-        </template>
-        <el-form-item label="任务说明">
-          <el-input v-model="taskForm.taskDescription" type="textarea" :rows="3" placeholder="填写要求或注意事项" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showCreateTaskDialog = false">取消</el-button>
-        <el-button type="primary" class="red-confirm-btn" :loading="taskSubmitting" @click="handleCreateTask">发布任务</el-button>
-      </template>
-    </el-dialog>
+
   </div>
 </template>
 
@@ -845,7 +814,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft, View, User, UserFilled, Edit, Plus, VideoPlay, Document, Headset, FolderOpened,
   Download, Delete, Link, Search, MagicStick, UploadFilled, Upload, Loading, Check,
-  CircleClose
+  CircleClose, DataAnalysis
 } from '@element-plus/icons-vue'
 import { logBehavior } from '@/api/report'
 import { analyzeCourseFile, getAiResourceRecommendations, getAiResourceRecommendationsByFile, type AiCourseAnalysisResponse, type AiRecommendationResponse } from '@/api/ai'
@@ -1636,30 +1605,7 @@ async function deleteTaskById(id: string) {
   ElMessage.success('已删除')
 }
 
-async function handleCreateTask() {
-  if (!taskForm.taskTitle.trim()) { ElMessage.warning('任务名称不能为空'); return }
-  if (taskForm.taskType !== 1) {
-    if (!taskForm.startTime) { ElMessage.warning('测验/考试的开始时间不能为空'); return }
-    if (!taskForm.endTime) { ElMessage.warning('测验/考试的截止时间不能为空'); return }
-  }
-  taskSubmitting.value = true
-  try {
-    const payload = { ...taskForm, courseId: courseId.value, status: 1 } // 默认立即发布
-    // 作业类型不传空字符串的时间，避免后端 LocalDateTime 解析报错
-    if (payload.taskType === 1) {
-      delete (payload as any).startTime
-      delete (payload as any).endTime
-    }
-    await createTask(courseId.value, payload)
-    ElMessage.success('任务发布成功')
-    showCreateTaskDialog.value = false
-    resetTaskForm()
-    fetchTasks()
-    if (course.value) course.value.taskCount = (course.value.taskCount || 0) + 1
-  } finally {
-    taskSubmitting.value = false
-  }
-}
+
 
 // 临时测试功能：手动完成任务并计分
 async function handleCompleteTestTask(task: any) {
@@ -1697,6 +1643,23 @@ async function handleCompleteTestTask(task: any) {
     }
   }
 }
+
+// ================== 考试流转路由 ==================
+const routerInstance = useRouter()
+
+function openPaperComposer(t: any) {
+  routerInstance.push(`/course/${courseId.value}/paper-composer/${t.id}`)
+}
+
+function openGradingPanel(t: any) {
+  routerInstance.push(`/course/${courseId.value}/grading/${t.id}`)
+}
+
+function startExamTask(t: any) {
+  routerInstance.push(`/course/${courseId.value}/exam/${t.id}`)
+}
+
+
 
 // ───── 讨论话题 ─────
 const postLoading = ref(false)

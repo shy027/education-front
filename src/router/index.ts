@@ -59,6 +59,24 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/course/CourseDetailPage.vue'),
         meta: { title: '课程详情', hideInMenu: true },
       },
+      {
+        path: 'course/:courseId/paper-composer/:taskId',
+        name: 'PaperComposer',
+        component: () => import('@/views/exam/PaperComposer.vue'),
+        meta: { title: '组卷与发布', hideInMenu: true, roles: ['TEACHER', 'ADMIN', 'SCHOOL_LEADER'] },
+      },
+      {
+        path: 'course/:courseId/grading/:taskId',
+        name: 'ExamGrading',
+        component: () => import('@/views/exam/ExamGradingPanel.vue'),
+        meta: { title: '批改与考情', hideInMenu: true, roles: ['TEACHER', 'ADMIN', 'SCHOOL_LEADER'] },
+      },
+      {
+        path: 'course/:courseId/exam/:taskId',
+        name: 'ExamTaking',
+        component: () => import('@/views/exam/ExamTakingPage.vue'),
+        meta: { title: '参加测验', hideInMenu: true },
+      },
 
       // 研讨社区（依附于具体课程，前台不提供独立入口）
       {
@@ -215,6 +233,12 @@ const routes: RouteRecordRaw[] = [
         name: 'AdminSubjects',
         component: () => import('@/views/admin/SubjectManagePage.vue'),
         meta: { title: '学科分类管理', icon: 'FolderOpened', roles: ['ADMIN'] },
+      },
+      {
+        path: 'questions',
+        name: 'AdminQuestions',
+        component: () => import('@/views/admin/QuestionBankPage.vue'),
+        meta: { title: '题库管理', icon: 'Document', roles: ['ADMIN'] },
       },
       {
         path: 'literacy-config',

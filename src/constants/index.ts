@@ -131,6 +131,7 @@ export const ADMIN_MENUS = [
   { title: '资源管理', icon: 'FolderOpened', path: '/admin/resources' },
   { title: '报告管理', icon: 'Document', path: '/admin/reports' },
   { title: '学科管理', icon: 'FolderOpened', path: '/admin/subjects' },
+  { title: '题库管理', icon: 'Document', path: '/admin/questions' },
   { title: '素养配置', icon: 'Setting', path: '/admin/literacy-config' },
   { title: '素养看板', icon: 'DataAnalysis', path: '/admin/student-literacy' },
 ]

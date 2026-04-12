@@ -210,6 +210,12 @@ export const updateBehaviorWeights = (data: Record<string, number>) =>
 export const refreshConfigCache = (configKey: string) =>
   post<void>('/v1/admin/config/refresh', null, { params: { configKey } })
 
+export const getExamDefaultScores = () =>
+  get<Record<string, number>>('/v1/admin/config/exam-scores')
+
+export const updateExamDefaultScores = (data: Record<string, number>) =>
+  put<void>('/v1/admin/config/exam-scores', data)
+
 // ===================== 看板统计 =====================
 
 export interface DashboardStats {

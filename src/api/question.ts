@@ -31,10 +31,19 @@ export interface QuestionQuery extends PageQuery {
   questionType?: number
   difficulty?: number
   keyword?: string
+  categoryId?: string
+  dimensions?: string[]  // Frontend arrays will be joined into string by axios, or we should define dimensions as string
 }
 
-export const getQuestionList = (params: QuestionQuery) =>
-  get<PageResponse<QuestionItem>>('/v1/questions', params)
+export const getQuestionList = (params: QuestionQuery) => {
+  const query = { ...params }
+  if (Array.isArray(query.dimensions) && query.dimensions.length > 0) {
+    query.dimensions = (query.dimensions as string[]).join(',')
+  } else {
+    delete query.dimensions // omit if empty array
+  }
+  return get<PageResponse<QuestionItem>>('/v1/questions', query as any)
+}
 
 export const getQuestionDetail = (id: string) =>
   get<QuestionItem>(`/v1/questions/${id}`)

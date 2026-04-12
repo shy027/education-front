@@ -16,8 +16,8 @@
             <input type="file" class="hidden" accept=".xlsx,.xls" @change="handleImport" />
           </label>
 
-          <button @click="openDialog()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center">
-            <span class="mr-2">➕</span> 手工录入
+          <button @click="openScoreConfig()" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors flex items-center">
+            <span class="mr-2">⚙️</span> 分值设置
           </button>
         </div>
       </div>
@@ -223,6 +223,50 @@
       </div>
     </div>
 
+    <!-- Score Config Dialog -->
+    <div v-if="scoreConfigVisible" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg px-4 pt-5 pb-4 overflow-hidden shadow-xl transform transition-all sm:max-w-lg sm:w-full sm:p-6">
+        <div>
+          <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">题型默认分值配置</h3>
+          <div class="mt-2 space-y-4">
+            <div class="p-3 bg-blue-50 text-blue-700 text-sm rounded border border-blue-100">
+              当教师使用“智能抽题”或从题库选取题目组卷时，这些分数将作为题目的默认单题得分。
+            </div>
+            <div class="grid grid-cols-2 gap-4 mt-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">单选题</label>
+                <input v-model.number="scoreConfig['1']" type="number" class="w-full border-gray-300 rounded-md shadow-sm p-2 border focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">多选题</label>
+                <input v-model.number="scoreConfig['2']" type="number" class="w-full border-gray-300 rounded-md shadow-sm p-2 border focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">判断题</label>
+                <input v-model.number="scoreConfig['3']" type="number" class="w-full border-gray-300 rounded-md shadow-sm p-2 border focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">填空题</label>
+                <input v-model.number="scoreConfig['4']" type="number" class="w-full border-gray-300 rounded-md shadow-sm p-2 border focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">简答题</label>
+                <input v-model.number="scoreConfig['5']" type="number" class="w-full border-gray-300 rounded-md shadow-sm p-2 border focus:ring-blue-500 focus:border-blue-500" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-5 sm:mt-6 sm:flex sm:flex-row-reverse">
+          <button @click="handleSaveScoreConfig" type="button" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm">
+            保存设置
+          </button>
+          <button @click="scoreConfigVisible = false" type="button" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+            取消
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -230,6 +274,7 @@
 import { ref, onMounted } from 'vue'
 import { getQuestionList, createQuestion, updateQuestion, deleteQuestion, downloadTemplate, importQuestions } from '@/api/question'
 import type { QuestionItem, QuestionQuery, QuestionOption } from '@/api/question'
+import { getExamDefaultScores, updateExamDefaultScores } from '@/api/report'
 import { Message } from '@arco-design/web-vue'
 
 const tableData = ref<QuestionItem[]>([])
@@ -249,9 +294,9 @@ const localOptions = ref<{content: string, isCorrect: boolean}[]>([])
 
 const fetchList = async () => {
   try {
-    const res = await getQuestionList(queryParams.value)
-    tableData.value = res.data.list || []
-    total.value = res.data.total || 0
+    const res = await getQuestionList(queryParams.value) as any
+    tableData.value = res?.list || res?.records || []
+    total.value = res?.total || 0
   } catch (error) {
     console.error('获取列表失败', error)
   }
@@ -293,7 +338,8 @@ const openDialog = (item?: QuestionItem) => {
       ]
     }
     if (item.questionType === 3) {
-      form.value.correctAnswer = item.options?.[0]?.content === '正确' && item.options?.[0].isCorrect ? '正确' : '错误'
+      const correctOpt = item.options?.find(o => o.isCorrect)
+      form.value.correctAnswer = correctOpt?.content || '正确'
     }
   } else {
     isEdit.value = false
@@ -383,6 +429,33 @@ const handleDelete = async (id: string) => {
     Message.error('删除失败')
   }
 }
+
+// 分值配置相关逻辑
+const scoreConfigVisible = ref(false)
+const scoreConfig = ref<Record<string, number>>({})
+
+const openScoreConfig = async () => {
+  try {
+    Message.loading('读取配置中...')
+    const res = await getExamDefaultScores()
+    scoreConfig.value = (res as any) || { '1': 5, '2': 5, '3': 5, '4': 5, '5': 10 }
+    scoreConfigVisible.value = true
+  } catch (err) {
+    Message.error('读取配置失败')
+  }
+}
+
+const handleSaveScoreConfig = async () => {
+  try {
+    Message.loading('保存中...')
+    await updateExamDefaultScores(scoreConfig.value)
+    Message.success('默认分值配置已保存')
+    scoreConfigVisible.value = false
+  } catch (err) {
+    Message.error('保存配置失败')
+  }
+}
+
 
 const handleDownloadTemplate = () => {
   downloadTemplate()

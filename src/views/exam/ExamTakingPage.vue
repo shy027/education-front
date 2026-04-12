@@ -8,9 +8,9 @@
           <h1 class="exam-title">{{ paper?.title || '在线考试' }}</h1>
         </div>
         <div class="header-right">
-          <div class="timer-box" :class="{ 'timer-warning': timeLeft < 300 }">
+          <div class="timer-box" :class="{ 'timer-warning': timeLeft < 300 && !isUnlimited }">
             <el-icon><Timer /></el-icon>
-            <span class="timer-text">{{ formatTime(timeLeft) }}</span>
+            <span class="timer-text">{{ isUnlimited && timeLeft > 86400 ? '不限时' : formatTime(timeLeft) }}</span>
           </div>
           <el-button type="primary" size="large" @click="handleSubmit">提交试卷</el-button>
         </div>
@@ -179,6 +179,7 @@ const currentQuestion = computed(() => questions.value[currentIndex.value])
 const unansweredCount = computed(() => {
   return questions.value.filter(q => !isAnswered(q.id)).length
 })
+const isUnlimited = computed(() => !paper.value?.durationMinutes)
 
 function formatTime(seconds: number) {
   if (seconds <= 0) return '00:00:00'
@@ -202,18 +203,18 @@ async function initPage() {
   loading.value = true
   try {
     // 1. 开始考试并获取记录ID
-    const startRes = await axios.post(`/v1/student/exams/${taskId}/start`)
-    recordId.value = startRes.data
+    const startRes = await axios.post(`/v1/student/exams/${taskId}/start`) as any
+    recordId.value = startRes
 
     // 2. 获取考试详情 (不含答案)
-    const detailRes = await axios.get(`/v1/student/exams/${taskId}`)
-    paper.value = detailRes.data
-    questions.value = detailRes.data.questions || []
+    const detail = await axios.get(`/v1/student/exams/${taskId}`) as any
+    paper.value = detail
+    questions.value = (detail?.questions || []).map((q: any) => ({ ...q, id: q.taskQuestionId }))
 
-    // 3. 恢复进度
-    const progressRes = await axios.get(`/v1/student/answers/${recordId.value}`)
-    if (progressRes.data && progressRes.data.answers) {
-      Object.assign(userAnswers, progressRes.data.answers)
+    // 3. Restore progress
+    const progress = await axios.get(`/v1/student/answers/${recordId.value}`) as any
+    if (progress?.answers) {
+      Object.assign(userAnswers, progress.answers)
     }
 
     // 4. 初始化计时器
@@ -221,25 +222,31 @@ async function initPage() {
     let examTimeLeft = Infinity
     
     // a. 如果有硬截止时间
-    if (paper.value.endTime) {
+    if (paper.value?.endTime) {
       examTimeLeft = dayjs(paper.value.endTime).diff(now, 'second')
     }
     
     // b. 如果有考试时长限制 (从学生点击“开始考试”时间起算)
-    if (paper.value.durationMinutes && progressRes.data.startTime) {
-      const recordStart = dayjs(progressRes.data.startTime)
+    if (paper.value?.durationMinutes && progress?.startTime) {
+      const recordStart = dayjs(progress.startTime)
       const durationLimit = recordStart.add(paper.value.durationMinutes, 'minute')
       const durationTimeLeft = durationLimit.diff(now, 'second')
       examTimeLeft = Math.min(examTimeLeft, durationTimeLeft)
     }
 
-    // c. 默认兜底
+    // c. 默认兜底 (仅在既没有硬截止时间，又没有时长限制时，且此时不标记为0时才兜底，或者干脆去掉兜底)
     if (examTimeLeft === Infinity) {
-      examTimeLeft = 3600 // 默认一小时
+      if (isUnlimited.value) {
+        examTimeLeft = 86400 * 365 // 一年，相当于不限时
+      } else {
+        examTimeLeft = 3600 // 默认一小时
+      }
     }
     
     timeLeft.value = Math.max(0, examTimeLeft)
-    startTimer()
+    if (!isUnlimited.value || timeLeft.value < 86400) {
+      startTimer()
+    }
   } catch (err: any) {
     ElMessage.error(err.message || '加载考试失败')
     router.back()
@@ -284,26 +291,38 @@ function isMultiSelected(questionId: number, label: string) {
 }
 
 function toggleMultiSelect(questionId: number, label: string) {
+  // 防御：如果 label 无效则不处理
+  if (!label) return
+
   let ans = userAnswers[questionId]
+  // 始终保证本地是数组状态
   if (!Array.isArray(ans)) {
-    // Try parsing existing string if any
     try {
-      ans = String(ans).split(',').filter(i => i)
+      const str = String(ans || '')
+      ans = str ? str.split(',').filter((i: string) => !!i && i !== 'undefined') : []
     } catch {
       ans = []
     }
   }
-  
+
   const idx = ans.indexOf(label)
   if (idx > -1) {
     ans.splice(idx, 1)
   } else {
     ans.push(label)
-    ans.sort()
+    // 只排序合法字符串，过滤掉任何 undefined
+    ans = ans.filter((i: any) => !!i && i !== 'undefined').sort()
   }
-  
-  userAnswers[questionId] = ans
-  saveAnswer(questionId, ans.join(','))
+
+  // 保持本地为数组（用于 isMultiSelected 判断），不让 saveAnswer 覆盖
+  userAnswers[questionId] = [...ans] // 新引用触发响应式更新
+
+  // 直接调 API（不走 saveAnswer，避免覆盖数组为字符串）
+  axios.post('/v1/student/answers/save', {
+    recordId: recordId.value,
+    taskQuestionId: questionId,
+    userAnswer: ans.join(',')
+  }).catch(() => {/* 静默失败，下次提交时仍会保存 */})
 }
 
 function handleSubmit() {

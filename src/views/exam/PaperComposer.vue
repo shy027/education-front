@@ -3,21 +3,26 @@
     <div class="composer-container">
       <!-- 粘性顶栏 -->
       <header class="composer-header">
-        <div class="flex justify-between items-center bg-white rounded-2xl shadow-sm px-6 py-4 border-l-4 border-red-600">
-          <div class="flex items-center gap-4">
-            <el-button circle plain @click="$router.back()" class="hover:bg-red-50 hover:border-red-200 flex-shrink-0">
+        <div style="display:grid; grid-template-columns:1fr auto 1fr; align-items:center; background:#fff; border-radius:1rem; box-shadow:0 1px 4px rgba(0,0,0,.08); padding:0 1.5rem; min-height:80px; border-left:4px solid #dc2626;">
+          <!-- 左侧返回按钮 -->
+          <div style="display:flex; justify-content:flex-start; align-items:center;">
+            <el-button circle @click="$router.back()" style="background:#dc2626; color:#fff; border-color:#dc2626; box-shadow:0 2px 8px rgba(220,38,38,.4);">
               <el-icon><ArrowLeft /></el-icon>
             </el-button>
-            <div>
-              <h1 class="text-xl font-bold text-gray-800">组卷编辑器</h1>
-              <p class="text-xs text-gray-400 mt-0.5">填写左侧任务信息，再从题库选题组装试卷</p>
-            </div>
           </div>
-          <div class="flex gap-3">
-            <el-button size="large" @click="handleSaveDraft" :loading="saving" class="rounded-xl">
+          
+          <!-- 居中标题 -->
+          <div style="text-align:center;">
+            <h1 style="font-size:1.2rem; font-weight:700; color:#1f2937; margin:0;">组卷编辑器</h1>
+            <p style="font-size:0.75rem; color:#9ca3af; margin:4px 0 0;">填写左侧任务信息，再从题库选题组装试卷</p>
+          </div>
+
+          <!-- 右侧操作按钮 -->
+          <div style="display:flex; justify-content:flex-end; align-items:center; gap:12px;">
+            <el-button size="large" @click="handleSaveDraft" :loading="saving" style="border-radius:0.75rem;">
               <el-icon class="mr-1"><Document /></el-icon>保存草稿
             </el-button>
-            <el-button type="primary" size="large" @click="handlePublish" :loading="publishing" class="rounded-xl shadow-md bg-red-600 border-red-600">
+            <el-button type="primary" size="large" @click="handlePublish" :loading="publishing" style="border-radius:0.75rem; background:#dc2626; border-color:#dc2626;">
               <el-icon class="mr-1"><Position /></el-icon>发布任务
             </el-button>
           </div>
@@ -72,7 +77,7 @@
         <main class="compose-main">
           <!-- 组卷统计与工具栏 -->
           <div class="bg-white rounded-2xl px-8 py-5 flex justify-between items-center border border-gray-100 shadow-sm">
-            <div class="flex items-center gap-10">
+            <div style="display:flex; align-items:center; gap:4rem;">
               <div class="text-center">
                 <div class="text-3xl font-bold text-gray-800">{{ paperQuestions.length }}</div>
                 <div class="text-xs text-gray-400 mt-1">题目总数</div>
@@ -83,34 +88,23 @@
                 <div class="text-xs text-gray-400 mt-1">当前总分</div>
               </div>
             </div>
-            <div class="flex gap-3">
-              <el-button type="danger" size="large" @click="openManualInput">
+            <div style="display:flex; gap:1.25rem;">
+              <el-button type="danger" size="large" @click="openManualInput" class="rounded-xl shadow-sm">
                 <el-icon class="mr-1"><Edit /></el-icon>单题录入
               </el-button>
-              <el-button type="danger" plain size="large" @click="openBankSelect">
+              <el-button type="danger" plain size="large" @click="openBankSelect" class="rounded-xl shadow-sm">
                 <el-icon class="mr-1"><Collection /></el-icon>题库选题
               </el-button>
-              <el-dropdown trigger="click">
-                <el-button size="large" circle plain><el-icon><MoreFilled /></el-icon></el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item @click="openSmartRecommend">
-                      <el-icon><MagicStick /></el-icon>AI 智能抽题
-                    </el-dropdown-item>
-                    <el-dropdown-item @click="openImport">
-                      <el-icon><Upload /></el-icon>批量导入
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+              <el-button type="primary" size="large" @click="openSmartRecommend" style="background:#6366f1; border-color:#6366f1; border-radius:0.75rem; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
+                <el-icon class="mr-1"><MagicStick /></el-icon>AI 智能抽题
+              </el-button>
             </div>
           </div>
 
           <!-- 题目列表 -->
           <div class="questions-container">
             <div v-if="paperQuestions.length === 0" class="bg-white rounded-2xl border-2 border-dashed border-gray-200 py-24 flex flex-col items-center justify-center">
-              <el-empty :image-size="140" description="试卷目前空空如也，请从题库添加题目" />
-              <el-button type="primary" size="large" @click="openBankSelect" class="mt-6 bg-red-600 border-red-600 rounded-xl">从题库开始引入</el-button>
+              <el-empty :image-size="140" description="试卷目前空空如也，请从上方操作栏添加题目" />
             </div>
               
               <transition-group name="list" tag="div" class="space-y-6">
@@ -201,31 +195,70 @@
             </el-upload>
           </div>
         </div>
+        
+        <div class="bank-toolbar-row mt-3 mb-3">
+           <el-tree-select 
+              v-model="bankQuery.categoryId" 
+              :data="categoryTree" 
+              :props="{ label: 'categoryName', value: 'id', children: 'children' }" 
+              node-key="id" 
+              placeholder="全学科" 
+              clearable 
+              check-strictly
+              @change="fetchBank"
+              class="w-48 shadow-sm rounded-md"
+            />
+            <el-select v-model="bankQuery.dimensions" multiple collapse-tags placeholder="全维度(多选包含)" class="w-64 ml-3" clearable @change="fetchBank">
+              <el-option label="知识技能素养" value="1" />
+              <el-option label="职业品格素养" value="2" />
+              <el-option label="创新实践素养" value="3" />
+              <el-option label="社会责任素养" value="4" />
+              <el-option label="发展适应素养" value="5" />
+            </el-select>
+        </div>
 
         <!-- 题目表格 -->
         <el-table 
+          ref="bankTableRef"
           :data="bankQuestions"
           v-loading="bankLoading"
           border
           stripe
+          row-key="id"
           @selection-change="handleSelectionChange"
           class="bank-table"
-          style="width: 100%"
         >
-          <el-table-column type="selection" width="50" fixed />
-          <el-table-column label="题型" width="100" fixed>
+          <el-table-column type="selection" width="50" fixed reserve-selection :selectable="checkSelectable" />
+          <el-table-column label="题型" width="100">
             <template #default="{ row }">
               <el-tag :type="row.questionType < 4 ? 'danger' : 'warning'" size="small">{{ getTypeName(row.questionType) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="题目内容">
+          <el-table-column label="题目内容" min-width="400">
             <template #default="{ row }">
-              <div class="text-sm text-gray-700 leading-relaxed line-clamp-2" v-html="row.content"></div>
+              <el-popover
+                placement="right"
+                :width="600"
+                trigger="hover"
+                effect="light"
+                popper-class="rich-popover"
+              >
+                <template #reference>
+                  <div class="single-line-content cursor-help" v-html="row.content"></div>
+                </template>
+                <div class="rich-content-popover" v-html="row.content"></div>
+              </el-popover>
             </template>
           </el-table-column>
-          <el-table-column label="难度" width="120">
+          <el-table-column label="评分与素养维度" min-width="350">
             <template #default="{ row }">
-              <el-rate v-model="row.difficulty" disabled size="small" />
+              <div class="flex items-center gap-2 whitespace-nowrap">
+                 <span class="text-xs text-gray-400 shrink-0">难度：</span>
+                 <el-rate v-model="row.difficulty" disabled size="small" class="shrink-0" />
+                 <div class="flex items-center gap-1 ml-2 inline-flex flex-nowrap">
+                    <el-tag v-for="d in parseDimensions(row.dimensions)" :key="d" type="info" size="small" effect="plain" class="shrink-0">{{ d }}</el-tag>
+                 </div>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -379,10 +412,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getQuestionList, recommendQuestions, createQuestion as apiCreateQuestion, downloadTemplate, importQuestions, type QuestionItem, type QuestionQuery } from '@/api/question'
 import { getCategoryTree } from '@/api/resource'
+import { getExamDefaultScores } from '@/api/report'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Setting, Document, Position, Check, Delete, Key, Collection, MagicStick, Search, Plus, Edit, Download, Upload, MoreFilled } from '@element-plus/icons-vue'
 import axios from '@/utils/request'
@@ -431,16 +465,33 @@ const bankQuestions = ref<QuestionItem[]>([])
 const bankTotal = ref(0)
 const selectedBankItems = ref<QuestionItem[]>([])
 const bankScope = ref('course') // 'course' or 'public'
+const bankTableRef = ref()
 
-const bankQuery = reactive<QuestionQuery>({
+function checkSelectable(row: QuestionItem) {
+  return !paperQuestions.value.some(q => q.id === row.id)
+}
+
+const bankQuery = reactive<any>({
   pageNum: 1,
   pageSize: 10,
   keyword: '',
   questionType: undefined,
-  courseId: courseId
+  courseId: courseId,
+  categoryId: undefined,
+  dimensions: []
 })
 
+function parseDimensions(dims?: string) {
+  if (!dims) return []
+  const map: Record<string, string> = { '1': '知识技能', '2': '职业品格', '3': '创新实践', '4': '社会责任', '5': '发展适应' }
+  return dims.split(',').map(d => map[d] || d).filter(Boolean)
+}
+
 function openBankSelect() {
+  selectedBankItems.value = []
+  if (bankTableRef.value) {
+    bankTableRef.value.clearSelection()
+  }
   showBankSelect.value = true
   fetchBank()
 }
@@ -457,6 +508,16 @@ async function fetchBank() {
     const res = await getQuestionList(bankQuery) as any
     bankQuestions.value = res.list || []
     bankTotal.value = res.total || 0
+    
+    // 自动回显已添加到试卷中的题目并使其被勾选（结合 selectable 做到不可取消）
+    nextTick(() => {
+      if (!bankTableRef.value) return
+      bankQuestions.value.forEach(row => {
+        if (paperQuestions.value.some(q => q.id === row.id)) {
+          bankTableRef.value.toggleRowSelection(row, true)
+        }
+      })
+    })
   } catch (err) {
     ElMessage.error('获取题库失败')
   } finally {
@@ -468,14 +529,27 @@ function handleSelectionChange(selection: QuestionItem[]) {
   selectedBankItems.value = selection
 }
 
+// 题型默认分值
+const defaultScores = ref<Record<string, number>>({})
+
 function confirmBankSelection() {
-  const toAdd = selectedBankItems.value.map(item => ({
-    ...item,
-    score: item.questionType === 5 ? 10 : 5 
-  }))
-  paperQuestions.value.push(...toAdd)
+  const toAdd = selectedBankItems.value
+    .filter(item => !paperQuestions.value.some(q => q.id === item.id))
+    .map(item => ({
+      ...item,
+      score: defaultScores.value[String(item.questionType)] || (item.questionType === 5 ? 10 : 5)
+    }))
+    
+  if (toAdd.length > 0) {
+    paperQuestions.value.push(...toAdd)
+    // 按照题型排布：单选(1) -> 多选(2) -> 判断(3) -> 填空(4) -> 简答(5)
+    paperQuestions.value.sort((a, b) => a.questionType - b.questionType)
+    ElMessage.success(`成功添加 ${toAdd.length} 道题目并已自动按题型排序`)
+  } else {
+    ElMessage.warning('没有新的题目被添加')
+  }
+  
   showBankSelect.value = false
-  ElMessage.success(`成功添加 ${toAdd.length} 道题目`)
 }
 
 // 单题导入逻辑 (由于用户要求暂时不实现导入即加入，仅保留导入功能)
@@ -582,10 +656,11 @@ async function submitManualQuestion() {
     // 加入当前试卷
     const newQuestion: PaperQuestion = {
       ...payload,
-      id: (res as any).data,
-      score: payload.questionType === 5 ? 10 : 5
+      id: res as any,
+      score: defaultScores.value[String(payload.questionType)] || (payload.questionType === 5 ? 10 : 5)
     }
     paperQuestions.value.push(newQuestion)
+    paperQuestions.value.sort((a, b) => a.questionType - b.questionType)
     showManualInput.value = false
     ElMessage.success('录入成功并已加入试卷')
   } catch {
@@ -615,13 +690,14 @@ async function handleRecommend() {
       recommendParams.categoryId,
       recommendParams.dimensions.length > 0 ? recommendParams.dimensions.join(',') : undefined
     )
-    const recs = (res as any).data.map((item: any) => ({
+    const recs = (res as any).map((item: any) => ({
       ...item,
-      score: item.questionType === 5 ? 10 : 5
+      score: defaultScores.value[String(item.questionType)] || (item.questionType === 5 ? 10 : 5)
     }))
     paperQuestions.value.push(...recs)
+    paperQuestions.value.sort((a, b) => a.questionType - b.questionType)
     showSmartRecommend.value = false
-    ElMessage.success(`智能抽出 ${recs.length} 道题目`)
+    ElMessage.success(`智能抽出 ${recs.length} 道题目并已自动按题型排序`)
   } catch {
     ElMessage.error('智能抽题失败')
   } finally {
@@ -634,15 +710,26 @@ const categoryTree = ref<any[]>([])
 async function fetchCategoryTree() {
   try {
     const res = await getCategoryTree()
-    categoryTree.value = (res as any).data || []
+    categoryTree.value = (res as any) || []
   } catch (err) {
     console.error('获取学科树失败', err)
+  }
+}
+
+// 获取默认分值配置
+async function fetchDefaultScores() {
+  try {
+    const res = await getExamDefaultScores()
+    defaultScores.value = (res as any) || {}
+  } catch (err) {
+    console.error('获取默认分值配置失败', err)
   }
 }
 
 // 页面数据装载
 onMounted(async () => {
   fetchCategoryTree()
+  fetchDefaultScores()
 
   if (!currentTaskId.value) {
     taskForm.taskTitle = '新建任务_' + new Date().toLocaleDateString()
@@ -650,16 +737,16 @@ onMounted(async () => {
   }
 
   try {
-    const res = await axios.get<any, any>(`/api/v1/papers/${currentTaskId.value}`)
-    if (res && res.data) {
-      taskForm.taskTitle = res.data.taskTitle || ''
-      taskForm.taskDescription = res.data.taskDescription || ''
-      taskForm.startTime = res.data.startTime || ''
-      taskForm.endTime = res.data.endTime || ''
-      taskForm.durationMinutes = res.data.durationMinutes || 0
+    const res = await axios.get<any, any>(`/v1/papers/${currentTaskId.value}`)
+    if (res) {
+      taskForm.taskTitle = res.taskTitle || ''
+      taskForm.taskDescription = res.taskDescription || ''
+      taskForm.startTime = res.startTime || ''
+      taskForm.endTime = res.endTime || ''
+      taskForm.durationMinutes = res.durationMinutes || 0
       
-      if (res.data.questions) {
-        paperQuestions.value = res.data.questions.map((pq: any) => ({
+      if (res.questions) {
+        paperQuestions.value = res.questions.map((pq: any) => ({
           ...pq,
           id: pq.questionId,
           score: pq.score
@@ -693,11 +780,11 @@ async function handleSaveDraft() {
         sortOrder: idx + 1
       }))
     }
-    const res = await axios.post<any, any>('/api/v1/papers/manual', payload)
+    const res = await axios.post<any, any>('/v1/papers/manual', payload)
     
     // 如果是首次保存，更新 taskId 并替换路由
-    if (!currentTaskId.value && res && res.data) {
-      currentTaskId.value = String(res.data)
+    if (!currentTaskId.value && res) {
+      currentTaskId.value = String(res)
       router.replace(`/course/${courseId}/paper-composer/${currentTaskId.value}`)
     }
     
@@ -742,11 +829,11 @@ async function handlePublish() {
         sortOrder: idx + 1
       }))
     }
-    const res = await axios.post<any, any>('/api/v1/papers/manual', payload)
-    const activeTaskId = currentTaskId.value || String(res.data)
+    const res = await axios.post<any, any>('/v1/papers/manual', payload)
+    const activeTaskId = currentTaskId.value || String(res)
     
     // 2. 更新任务状态为进行中 (1)
-    await axios.put(`/api/v1/courses/${courseId}/tasks/${activeTaskId}/status?status=1`)
+    await axios.put(`/v1/courses/${courseId}/tasks/${activeTaskId}/status?status=1`)
     
     ElMessage.success('发布成功')
     router.replace(`/course/${courseId}`)
@@ -765,16 +852,17 @@ async function handlePublish() {
 }
 
 .composer-container {
-  max-width: 1500px;
+  width: 95%;
+  max-width: 1700px;
   margin: 0 auto;
-  padding: 0 2.5rem 6rem;
+  padding: 0 1rem 6rem;
 }
 
 /* ===== 粘性顶栏 ===== */
 .composer-header {
   position: sticky;
   top: 0;
-  z-index: 200;
+  z-index: 10;
   padding-top: 1.5rem;
   padding-bottom: 1.25rem;
   background-color: #f1f5f9;
@@ -783,13 +871,13 @@ async function handlePublish() {
 /* ===== 主布局 ===== */
 .layout-body {
   display: flex;
-  gap: 2rem;
+  gap: 4rem;
   align-items: flex-start;
 }
 
 /* ===== 左侧侧边栏 ===== */
 .sidebar-aside {
-  width: 360px;
+  width: 380px;
   flex-shrink: 0;
 }
 
@@ -889,11 +977,33 @@ async function handlePublish() {
 /* ===== 弹窗表格 ===== */
 .bank-table {
   border-radius: 8px;
-  overflow: hidden;
 }
-.bank-table :deep(.el-table__body-wrapper) {
-  max-height: 440px;
+
+/* 题目详情弹窗样式 */
+.rich-content-popover {
+  max-height: 400px;
   overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* 强制单行显示并忽略内部 p 标签造成的换行 */
+.single-line-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  color: #374151;
+}
+.single-line-content * {
+  display: inline !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+:deep(.rich-popover) {
+  padding: 15px !important;
+  border-radius: 8px !important;
 }
 
 /* ===== 弹窗底部行 ===== */

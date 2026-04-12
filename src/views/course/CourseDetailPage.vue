@@ -304,10 +304,40 @@
 
                 <!-- 学生视图 -->
                 <template v-if="!isMyTeaching && isMember && !isCourseFinished">
-                  <el-button v-if="t.status === 1 && (t.taskType === 2 || t.taskType === 3)" type="primary" size="small" @click="startExamTask(t)">
-                    参加考试
-                  </el-button>
-                  <el-button v-if="t.taskType === 1" type="success" size="small" @click="handleCompleteTestTask(t)">
+                  <!-- 1. 考试/测验 (2/3) 简化单按钮逻辑 -->
+                  <template v-if="t.taskType === 2 || t.taskType === 3">
+                    <div class="flex items-center gap-2">
+                       <!-- 状态 A: 时间未到 -->
+                       <el-button v-if="t.examStatus === 0" disabled size="small">暂未开始</el-button>
+
+                       <!-- 状态 B: 进行中或可重试 -->
+                       <el-button 
+                          v-else-if="t.examStatus === 1 && (t.inProgressId || t.attemptCount < (t.maxRetryTimes || 1))" 
+                          type="primary" 
+                          size="small" 
+                          @click="startExamTask(t)"
+                       >
+                          {{ t.inProgressId ? '继续考试' : '参加考试' }}
+                       </el-button>
+
+                       <!-- 辅助标记: 批改中 -->
+                       <el-tag v-if="t.studentStatus === 1" type="warning" effect="plain" size="small">批改中</el-tag>
+                       
+                       <!-- 辅助按钮: 查看成绩 (只要有尝试过且非进行中状态即可看最高分记录) -->
+                       <el-button 
+                          v-if="(t.attemptCount ?? 0) > 0 && t.studentStatus !== 0" 
+                          type="success" 
+                          plain
+                          size="small" 
+                          @click="viewExamResult(t)"
+                       >
+                          查看成绩
+                       </el-button>
+                    </div>
+                  </template>
+                  
+                  <!-- 2. 普通作业 (1) -->
+                  <el-button v-if="t.taskType === 1 && (t.studentStatus === undefined || t.studentStatus === null)" type="success" size="small" @click="handleCompleteTestTask(t)">
                     完成(测试作业)
                   </el-button>
                 </template>
@@ -1655,8 +1685,43 @@ function openGradingPanel(t: any) {
   routerInstance.push(`/course/${courseId.value}/grading/${t.id}`)
 }
 
-function startExamTask(t: any) {
-  routerInstance.push(`/course/${courseId.value}/exam/${t.id}`)
+async function startExamTask(t: TaskItem) {
+  let confirmMsg = ''
+  let confirmTitle = '考试确认'
+  
+  if (t.inProgressId) {
+    confirmMsg = '您有正在进行的答卷，确定继续吗？'
+    confirmTitle = '继续考试'
+  } else {
+    const attempt = (t.attemptCount || 0) + 1
+    const remaining = (t.maxRetryTimes || 1) - (t.attemptCount || 0)
+    confirmMsg = `这是您的第 ${attempt} 次参加，将开启新答卷。您还剩 ${remaining} 次机会，确定开始吗？`
+    confirmTitle = '参加考试'
+  }
+
+  try {
+    await ElMessageBox.confirm(confirmMsg, confirmTitle, {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: t.inProgressId ? 'info' : 'warning'
+    })
+
+    const res = await startExam(t.id) as any
+    routerInstance.push({
+      path: `/course/${courseId.value}/exam/${t.id}`,
+      query: { recordId: res.recordId || res }
+    })
+  } catch (err: any) {
+    if (err !== 'cancel') {
+      ElMessage.error(err.message || '操作失败')
+    }
+  }
+}
+
+function viewExamResult(t: TaskItem) {
+  const rid = t.bestRecordId || t.studentRecordId
+  if (!rid) return
+  routerInstance.push(`/course/${courseId.value}/exam-result/${rid}`)
 }
 
 

@@ -46,8 +46,9 @@
               </div>
               <div class="student-score-row">
                 <span>总分：<strong style="color:#3b82f6">{{ record.totalScore || 0 }}</strong></span>
-                <span v-if="record.pendingCount > 0" style="color:#ef4444">待批改：{{ record.pendingCount }}</span>
-                <span v-else style="color:#22c55e">批改完成</span>
+                <span v-if="record.gradingStatus === 2" style="color:#22c55e">批改完成</span>
+                <span v-else-if="record.pendingCount > 0" style="color:#ef4444">待批改：{{ record.pendingCount }}</span>
+                <span v-else style="color:#3b82f6">批改中</span>
               </div>
             </div>
           </div>
@@ -62,8 +63,9 @@
                 <span style="margin-left:16px;color:#6b7280;font-size:14px;">
                   当前总分：<strong style="color:#dc2626;font-size:18px;">{{ selectedRecord.totalScore || 0 }}</strong>
                 </span>
+                <el-tag v-if="selectedRecord.gradingStatus === 2" type="success" size="small" style="margin-left:12px;">已发布</el-tag>
               </div>
-              <el-button type="success" @click="handlePublishResult" :disabled="selectedRecord.gradingStatus !== 2">发布成绩</el-button>
+              <el-button type="success" @click="handlePublishResult" :disabled="selectedRecord.gradingStatus !== 2 || selectedRecord.status === 2">发布成绩</el-button>
             </div>
 
             <div class="answer-list">
@@ -82,6 +84,7 @@
                       size="small"
                       controls-position="right"
                       @change="saveGrade(ans.answerId)"
+                      :disabled="selectedRecord.status === 2"
                     />
                     <span style="color:#9ca3af;">/ {{ ans.fullScore }}</span>
                     <el-icon v-if="ans.isCorrect === true" color="#22c55e"><CircleCheck /></el-icon>
@@ -94,11 +97,11 @@
                 <div class="answer-grid">
                   <div class="answer-box student-answer-box">
                     <div class="answer-box-title" style="color:#1d4ed8;">学生答案：</div>
-                    <div class="answer-box-content">{{ ans.userAnswer || '（未作答）' }}</div>
+                    <div class="answer-box-content">{{ formatAnswer(ans.userAnswer, ans.questionType) || '（未作答）' }}</div>
                   </div>
                   <div class="answer-box ref-answer-box">
                     <div class="answer-box-title" style="color:#15803d;">标准/参考答案：</div>
-                    <div class="answer-box-content">{{ ans.correctAnswer || '无' }}</div>
+                    <div class="answer-box-content">{{ formatAnswer(ans.correctAnswer, ans.questionType) || '无' }}</div>
                   </div>
                 </div>
 
@@ -108,6 +111,7 @@
                   size="small"
                   style="margin-top:12px;"
                   @blur="saveGrade(ans.answerId)"
+                  :disabled="selectedRecord.status === 2"
                 >
                   <template #prepend>评语</template>
                 </el-input>
@@ -209,10 +213,19 @@ function getStatusType(status: number) {
   return ({ 0: 'info', 1: 'warning', 2: 'success' } as any)[status] || 'info'
 }
 function getStatusLabel(status: number) {
-  return ({ 0: '未批改', 1: '批改中', 2: '批改完成' } as any)[status] || '待处理'
+  return ({ 0: '待提交', 1: '待批改', 2: '批改完成' } as any)[status] || '待处理'
 }
 function getTypeName(type: number) {
   return ({ 1: '单选题', 2: '多选题', 3: '判断题', 4: '填空题', 5: '简答题' } as any)[type] || '未知'
+}
+
+function formatAnswer(val: string, type: number) {
+  if (!val) return val
+  if (type === 3) {
+    if (val === 'A') return '正确'
+    if (val === 'B') return '错误'
+  }
+  return val
 }
 
 onMounted(() => {

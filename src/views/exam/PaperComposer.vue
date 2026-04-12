@@ -66,8 +66,31 @@
                 />
               </el-form-item>
 
-              <el-form-item label="考试说明" class="mb-0">
-                <el-input v-model="taskForm.taskDescription" type="textarea" :rows="4" placeholder="学生开始前可见的说明与注意事项..." />
+              <el-form-item label="考试说明">
+                <el-input v-model="taskForm.taskDescription" type="textarea" :rows="3" placeholder="学生开始前可见的说明与注意事项..." />
+              </el-form-item>
+
+              <div class="flex items-center justify-between mb-4 mt-6 pt-4 border-t border-gray-100">
+                <span class="text-sm font-bold text-gray-700">考试配置</span>
+              </div>
+
+              <el-form-item label="允许重做">
+                <div class="flex items-center justify-between w-full">
+                  <el-switch v-model="taskForm.allowRetry" :active-value="1" :inactive-value="0" active-color="#dc2626" />
+                  <span class="text-xs text-gray-400">允许学生多次参加</span>
+                </div>
+              </el-form-item>
+
+              <el-form-item v-if="taskForm.allowRetry" label="最大参加次数">
+                <el-input-number v-model="taskForm.maxRetryTimes" :min="1" :max="100" class="w-full" />
+                <div class="text-xs text-gray-400 mt-1">包含首次参加在内的总次数</div>
+              </el-form-item>
+
+              <el-form-item label="显示答案">
+                <div class="flex items-center justify-between w-full">
+                  <el-switch v-model="taskForm.showAnswer" :active-value="1" :inactive-value="0" active-color="#dc2626" />
+                  <span class="text-xs text-gray-400">批改后学生可见正确答案</span>
+                </div>
               </el-form-item>
             </el-form>
           </div>
@@ -372,8 +395,24 @@
       </el-dialog>
 
       <!-- 智能抽题弹窗 -->
-      <el-dialog v-model="showSmartRecommend" title="AI智能抽题" width="550px">
+      <el-dialog v-model="showSmartRecommend" title="AI智能抽题" width="600px">
         <el-form label-width="110px">
+          <el-form-item label="题库范围">
+            <el-checkbox-group v-model="recommendParams.scopes">
+              <el-checkbox value="course">本课程题库</el-checkbox>
+              <el-checkbox value="public">公共题库</el-checkbox>
+            </el-checkbox-group>
+            <!-- <div class="text-xs text-gray-400 mt-1">默认全选，将从勾选的范围中匹配题目</div> -->
+          </el-form-item>
+          <el-form-item label="选择题型">
+            <el-checkbox-group v-model="recommendParams.questionTypes">
+              <el-checkbox :value="1">单选题</el-checkbox>
+              <el-checkbox :value="2">多选题</el-checkbox>
+              <el-checkbox :value="3">判断题</el-checkbox>
+              <el-checkbox :value="4">填空题</el-checkbox>
+              <el-checkbox :value="5">简答题</el-checkbox>
+            </el-checkbox-group>
+          </el-form-item>
           <el-form-item label="抽题数量">
             <el-input-number v-model="recommendParams.count" :min="1" :max="50" />
             <span class="ml-3 text-xs text-gray-400">目前系统内置随机抽题</span>
@@ -384,14 +423,14 @@
               :data="categoryTree" 
               :props="{ label: 'categoryName', value: 'id', children: 'children' }" 
               node-key="id" 
-              placeholder="默认全学科 (选择父级将向下兼容所有子分类)" 
+              placeholder="默认使用本课程学科" 
               clearable 
               check-strictly
               class="w-full"
             />
           </el-form-item>
           <el-form-item label="素养维度">
-             <el-select v-model="recommendParams.dimensions" multiple placeholder="默认不限制 (可结合画像选取薄弱点)" class="w-full">
+             <el-select v-model="recommendParams.dimensions" multiple placeholder="默认包含本课程素养 (多选为包含其一即可)" class="w-full">
               <el-option label="知识技能素养" value="1" />
               <el-option label="职业品格素养" value="2" />
               <el-option label="创新实践素养" value="3" />
@@ -399,8 +438,8 @@
               <el-option label="发展适应素养" value="5" />
             </el-select>
           </el-form-item>
-          <el-form-item label="题型分布">
-            <p class="text-xs text-gray-500 leading-tight mt-1">系统将基于系统内该课程/学科维度的画像特征，自动为您匹配最具考察价值的客观题和主观题。</p>
+          <el-form-item label="智能说明">
+            <p class="text-xs text-gray-500 leading-tight mt-1">系统将基于题库数据，为您匹配符合条件的题目。若设置了素养维度，将优先抽取至少包含其中一个维度的题目。</p>
           </el-form-item>
         </el-form>
         <template #footer>
@@ -416,6 +455,7 @@ import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getQuestionList, recommendQuestions, createQuestion as apiCreateQuestion, downloadTemplate, importQuestions, type QuestionItem, type QuestionQuery } from '@/api/question'
 import { getCategoryTree } from '@/api/resource'
+import { getCourseDetail } from '@/api/course'
 import { getExamDefaultScores } from '@/api/report'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Setting, Document, Position, Check, Delete, Key, Collection, MagicStick, Search, Plus, Edit, Download, Upload, MoreFilled } from '@element-plus/icons-vue'
@@ -436,7 +476,10 @@ const taskForm = reactive({
   taskDescription: '',
   startTime: '',
   endTime: '',
-  durationMinutes: 0
+  durationMinutes: 0,
+  allowRetry: 0,
+  maxRetryTimes: 1,
+  showAnswer: 1
 })
 
 const saving = ref(false)
@@ -673,6 +716,8 @@ const showSmartRecommend = ref(false)
 const recommending = ref(false)
 const recommendParams = reactive({
   count: 10,
+  scopes: ['course', 'public'] as string[],
+  questionTypes: [1, 2, 3, 4, 5] as number[],
   categoryId: undefined as string | undefined,
   dimensions: [] as string[]
 })
@@ -682,11 +727,19 @@ function openSmartRecommend() {
 }
 
 async function handleRecommend() {
+  if (recommendParams.scopes.length === 0) return ElMessage.warning('请至少选择一个题库范围')
+  if (recommendParams.questionTypes.length === 0) return ElMessage.warning('请至少选择一个题型')
+  
   recommending.value = true
   try {
+    const courseIds: number[] = []
+    if (recommendParams.scopes.includes('course')) courseIds.push(Number(courseId))
+    if (recommendParams.scopes.includes('public')) courseIds.push(0)
+
     const res = await recommendQuestions(
       recommendParams.count, 
-      bankScope.value === 'public' ? undefined : courseId,
+      courseIds,
+      recommendParams.questionTypes,
       recommendParams.categoryId,
       recommendParams.dimensions.length > 0 ? recommendParams.dimensions.join(',') : undefined
     )
@@ -737,6 +790,18 @@ onMounted(async () => {
   }
 
   try {
+    // 获取课程详情以获取默认 学科 和 维度
+    const cRes = await getCourseDetail(courseId)
+    if (cRes) {
+      if (!recommendParams.categoryId) recommendParams.categoryId = cRes.subjectArea
+      if (recommendParams.dimensions.length === 0 && cRes.dimensionWeights) {
+        try {
+          const weights = JSON.parse(cRes.dimensionWeights)
+          recommendParams.dimensions = Object.keys(weights)
+        } catch(e) {}
+      }
+    }
+
     const res = await axios.get<any, any>(`/v1/papers/${currentTaskId.value}`)
     if (res) {
       taskForm.taskTitle = res.taskTitle || ''
@@ -744,6 +809,9 @@ onMounted(async () => {
       taskForm.startTime = res.startTime || ''
       taskForm.endTime = res.endTime || ''
       taskForm.durationMinutes = res.durationMinutes || 0
+      taskForm.allowRetry = res.allowRetry ?? 0
+      taskForm.maxRetryTimes = res.maxRetryTimes || 1
+      taskForm.showAnswer = res.showAnswer ?? 1
       
       if (res.questions) {
         paperQuestions.value = res.questions.map((pq: any) => ({
@@ -774,6 +842,9 @@ async function handleSaveDraft() {
       startTime: taskForm.startTime,
       endTime: taskForm.endTime,
       durationMinutes: taskForm.durationMinutes,
+      allowRetry: taskForm.allowRetry,
+      maxRetryTimes: taskForm.maxRetryTimes,
+      showAnswer: taskForm.showAnswer,
       questions: paperQuestions.value.map((q, idx) => ({
         questionId: q.id,
         score: q.score,
@@ -823,6 +894,9 @@ async function handlePublish() {
       startTime: taskForm.startTime,
       endTime: taskForm.endTime,
       durationMinutes: taskForm.durationMinutes,
+      allowRetry: taskForm.allowRetry,
+      maxRetryTimes: taskForm.maxRetryTimes,
+      showAnswer: taskForm.showAnswer,
       questions: paperQuestions.value.map((q, idx) => ({
         questionId: q.id,
         score: q.score,

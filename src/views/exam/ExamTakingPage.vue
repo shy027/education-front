@@ -89,16 +89,16 @@
               <div v-else-if="currentQuestion.questionType === 3" class="options-list tf-options">
                 <div 
                   class="option-item"
-                  :class="{ 'is-selected': userAnswers[currentQuestion.id] === '正确' }"
-                  @click="saveAnswer(currentQuestion.id, '正确')"
+                  :class="{ 'is-selected': userAnswers[currentQuestion.id] === 'A' || userAnswers[currentQuestion.id] === '正确' }"
+                  @click="saveAnswer(currentQuestion.id, 'A')"
                 >
                   <span class="option-label">A</span>
                   <div class="option-text">正确</div>
                 </div>
                 <div 
                   class="option-item"
-                  :class="{ 'is-selected': userAnswers[currentQuestion.id] === '错误' }"
-                  @click="saveAnswer(currentQuestion.id, '错误')"
+                  :class="{ 'is-selected': userAnswers[currentQuestion.id] === 'B' || userAnswers[currentQuestion.id] === '错误' }"
+                  @click="saveAnswer(currentQuestion.id, 'B')"
                 >
                   <span class="option-label">B</span>
                   <div class="option-text">错误</div>

@@ -115,6 +115,16 @@ export interface TaskItem {
   durationMinutes?: number
   status: number          // 0=草稿 1=发布 2=结束
   submitCount: number
+  studentRecordId?: string | number;
+  studentStatus?: number;  // 0=进行中 1=已提交 2=已批改
+  studentScore?: number;
+  allowRetry?: number;     // 0-否 1-是
+  maxRetryTimes?: number;
+  showAnswer?: number;
+  attemptCount?: number;   // 当前已完成尝试次数
+  inProgressId?: string | number; // 进行中的 recordId
+  bestRecordId?: string | number; // 最高分的 recordId
+  examStatus?: number;     // 时间计算状态: 0-未开始 1-进行中 2-已结束
 }
 
 export interface AnnouncementItem {

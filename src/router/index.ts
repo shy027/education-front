@@ -77,6 +77,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/exam/ExamTakingPage.vue'),
         meta: { title: '参加测验', hideInMenu: true },
       },
+      {
+        path: 'course/:courseId/exam-result/:recordId',
+        name: 'ExamResult',
+        component: () => import('@/views/exam/ExamResultPage.vue'),
+        meta: { title: '考试结果', hideInMenu: true },
+      },
 
       // 研讨社区（依附于具体课程，前台不提供独立入口）
       {

@@ -23,6 +23,9 @@ export interface QuestionItem {
   analysis?: string
   categoryId?: string
   dimensions?: string
+  courseName?: string
+  categoryName?: string
+  dimensionNames?: string
 }
 
 export interface QuestionQuery extends PageQuery {
@@ -33,6 +36,7 @@ export interface QuestionQuery extends PageQuery {
   keyword?: string
   categoryId?: string
   dimensions?: string[]  // Frontend arrays will be joined into string by axios, or we should define dimensions as string
+  bankType?: number  // 0-全部, 1-公共题库, 2-非公共题库
 }
 
 export const getQuestionList = (params: QuestionQuery) => {
@@ -88,5 +92,9 @@ export const importQuestions = (file: File, courseId?: string) => {
   return upload<void>(url, form)
 }
 
-export const recommendQuestions = (count: number, courseId?: string, categoryId?: string, dimensions?: string) =>
-  get<QuestionItem[]>('/v1/questions/recommend', { count, courseId, categoryId, dimensions })
+export const recommendQuestions = (count: number, courseIds?: string[] | number[], questionTypes?: number[], categoryId?: string, dimensions?: string) => {
+  const params: any = { count, categoryId, dimensions }
+  if (courseIds && courseIds.length > 0) params.courseIds = courseIds.join(',')
+  if (questionTypes && questionTypes.length > 0) params.questionTypes = questionTypes.join(',')
+  return get<QuestionItem[]>('/v1/questions/recommend', params)
+}

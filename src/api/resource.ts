@@ -87,8 +87,8 @@ export interface AuditLog {
 export const getResourceList = (params: ResourceQuery) =>
   get<PageResponse<ResourceItem>>('/v1/resources', params)
 
-export const getResourceDetail = (id: string) =>
-  get<ResourceItem>(`/v1/resources/${id}`)
+export const getResourceDetail = (id: string, config?: any) =>
+  get<ResourceItem>(`/v1/resources/${id}`, null, config)
 
 export const createResource = (data: ResourceCreateReq) =>
   post<string>('/v1/resources', data)

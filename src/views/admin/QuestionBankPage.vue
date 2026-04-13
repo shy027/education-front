@@ -36,6 +36,7 @@
 
           <!-- 学科领域筛选 -->
           <el-select v-model="queryParams.categoryId" placeholder="学科领域" clearable @change="handleSearch" style="width: 160px">
+            <el-option label="未分类" value="unclassified" />
             <el-option v-for="item in subjectList" :key="item.id" :label="item.name" :value="item.id" />
           </el-select>
 

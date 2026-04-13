@@ -303,43 +303,74 @@
                 </template>
 
                 <!-- 学生视图 -->
-                <template v-if="!isMyTeaching && isMember && !isCourseFinished">
-                  <!-- 1. 考试/测验 (2/3) 简化单按钮逻辑 -->
-                  <template v-if="t.taskType === 2 || t.taskType === 3">
-                    <div class="flex items-center gap-2">
-                       <!-- 状态 A: 时间未到 -->
-                       <el-button v-if="t.examStatus === 0" disabled size="small">暂未开始</el-button>
+                <template v-if="!isMyTeaching">
+                   <template v-if="isMember && !isCourseFinished">
+                     <!-- 1. 考试/测验 (2/3) 简化单按钮逻辑 -->
+                     <template v-if="t.taskType === 2 || t.taskType === 3">
+                       <div class="flex items-center gap-2">
+                          <!-- 状态 A: 时间未到 -->
+                          <el-button v-if="t.examStatus === 0" disabled size="small">暂未开始</el-button>
 
-                       <!-- 状态 B: 进行中或可重试 -->
-                       <el-button 
-                          v-else-if="t.examStatus === 1 && (t.inProgressId || t.attemptCount < (t.maxRetryTimes || 1))" 
-                          type="primary" 
-                          size="small" 
-                          @click="startExamTask(t)"
-                       >
-                          {{ t.inProgressId ? '继续考试' : '参加考试' }}
-                       </el-button>
+                          <!-- 状态 B: 进行中或可重试 -->
+                          <el-button 
+                             v-else-if="t.examStatus === 1 && (t.inProgressId || t.attemptCount < (t.maxRetryTimes || 1))" 
+                             type="primary" 
+                             size="small" 
+                             @click="startExamTask(t)"
+                          >
+                             {{ t.inProgressId ? '继续考试' : '参加考试' }}
+                          </el-button>
 
-                       <!-- 辅助标记: 批改中 -->
-                       <el-tag v-if="t.studentStatus === 1" type="warning" effect="plain" size="small">批改中</el-tag>
-                       
-                       <!-- 辅助按钮: 查看成绩 (只要有尝试过且非进行中状态即可看最高分记录) -->
-                       <el-button 
-                          v-if="(t.attemptCount ?? 0) > 0 && t.studentStatus !== 0" 
-                          type="success" 
-                          plain
-                          size="small" 
-                          @click="viewExamResult(t)"
-                       >
-                          查看成绩
-                       </el-button>
-                    </div>
-                  </template>
-                  
-                  <!-- 2. 普通作业 (1) -->
-                  <el-button v-if="t.taskType === 1 && (t.studentStatus === undefined || t.studentStatus === null)" type="success" size="small" @click="handleCompleteTestTask(t)">
-                    完成(测试作业)
-                  </el-button>
+                          <!-- 辅助标记: 批改中 -->
+                          <el-tag v-if="t.studentStatus === 1" type="warning" effect="plain" size="small">批改中</el-tag>
+                          
+                          <!-- 辅助按钮: 查看成绩 (显示所有已批改的记录) -->
+                          <template v-if="(t.gradedRecords?.length ?? 0) > 0">
+                            <!-- 只有一个记录时显示普通按钮 -->
+                            <el-button 
+                               v-if="t.gradedRecords.length === 1"
+                               type="success" 
+                               plain
+                               size="small" 
+                               @click="viewExamResult(t, t.gradedRecords[0].recordId)"
+                            >
+                               查看成绩
+                            </el-button>
+                            
+                            <!-- 多个记录时显示下拉菜单 -->
+                            <el-dropdown v-else trigger="click" @command="(id) => viewExamResult(t, id)">
+                              <el-button type="success" plain size="small">
+                                查看成绩 ({{ t.gradedRecords.length }}) <el-icon class="el-icon--right"><arrow-down /></el-icon>
+                              </el-button>
+                              <template #dropdown>
+                                <el-dropdown-menu>
+                                  <el-dropdown-item 
+                                    v-for="gr in t.gradedRecords" 
+                                    :key="gr.recordId" 
+                                    :command="gr.recordId"
+                                  >
+                                    <div style="display:flex;justify-content:space-between;gap:20px;min-width:180px;">
+                                      <span>得分：<strong style="color:#dc2626">{{ gr.score }}</strong></span>
+                                      <span style="color:#94a3b8;font-size:12px;">{{ formatDate(gr.submitTime) }}</span>
+                                    </div>
+                                  </el-dropdown-item>
+                                </el-dropdown-menu>
+                              </template>
+                            </el-dropdown>
+                          </template>
+                       </div>
+                     </template>
+                     
+                     <!-- 2. 普通作业 (1) -->
+                     <el-button v-if="t.taskType === 1 && (t.studentStatus === undefined || t.studentStatus === null)" type="success" size="small" @click="handleCompleteTestTask(t)">
+                       完成(测试作业)
+                     </el-button>
+                   </template>
+
+                   <!-- 非成员提示 -->
+                   <template v-else-if="!isMember && !authStore.isAdmin">
+                     <el-tag type="info" size="small" effect="plain">暂未加入该课程</el-tag>
+                   </template>
                 </template>
               </div>
             </div>
@@ -834,7 +865,8 @@ import {
   submitCourseForReview,
   deleteCourseDraft,
   updateCourseStatus,
-  checkMembership, // Added checkMembership import
+  checkMembership,
+  startExam,
 } from '@/api/course'
 import type { PageResponse } from '@/types/api'
 import { getPostList, createPost, type PostItem } from '@/api/community'
@@ -844,7 +876,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   ArrowLeft, View, User, UserFilled, Edit, Plus, VideoPlay, Document, Headset, FolderOpened,
   Download, Delete, Link, Search, MagicStick, UploadFilled, Upload, Loading, Check,
-  CircleClose, DataAnalysis
+  CircleClose, DataAnalysis, ArrowDown
 } from '@element-plus/icons-vue'
 import { logBehavior } from '@/api/report'
 import { analyzeCourseFile, getAiResourceRecommendations, getAiResourceRecommendationsByFile, type AiCourseAnalysisResponse, type AiRecommendationResponse } from '@/api/ai'
@@ -1718,10 +1750,23 @@ async function startExamTask(t: TaskItem) {
   }
 }
 
-function viewExamResult(t: TaskItem) {
-  const rid = t.bestRecordId || t.studentRecordId
-  if (!rid) return
-  routerInstance.push(`/course/${courseId.value}/exam-result/${rid}`)
+function viewExamResult(t: TaskItem, recordId?: string | number) {
+  const targetId = recordId || t.studentRecordId
+  if (!targetId) return
+
+  router.push({
+    name: 'ExamResult',
+    params: { 
+      courseId: courseId.value,
+      recordId: targetId 
+    }
+  })
+}
+
+function formatDate(dateStr: string) {
+  if (!dateStr) return '—'
+  const date = new Date(dateStr)
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
 

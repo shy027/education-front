@@ -114,7 +114,7 @@ export interface TaskItem {
   totalScore?: number
   durationMinutes?: number
   status: number          // 0=草稿 1=发布 2=结束
-  submitCount: number
+  submitCount: number;    // 语义上已改为参与人数
   studentRecordId?: string | number;
   studentStatus?: number;  // 0=进行中 1=已提交 2=已批改
   studentScore?: number;

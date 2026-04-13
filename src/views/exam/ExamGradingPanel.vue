@@ -11,7 +11,7 @@
           </div>
         </div>
         <div class="stat-card">
-          <span class="stat-label">已提交</span>
+          <span class="stat-label">参与人数</span>
           <span class="stat-value">{{ totalSubmitted }}</span>
         </div>
       </div>
@@ -20,19 +20,37 @@
       <div class="grading-body">
         <!-- Left: Student List -->
         <div class="student-panel">
-          <div class="panel-header">学生列表（{{ submittedList.length }} 人）</div>
+          <div class="panel-header">
+            <span>学生列表（{{ filteredList.length }} / {{ totalSubmitted }} 人）</span>
+          </div>
+
+          <!-- Filter Section -->
+          <div class="filter-section">
+             <div class="filter-row">
+                <el-select v-model="filters.status" placeholder="状态筛选" size="small" clearable style="width: 100%;">
+                  <el-option label="全部状态" :value="null" />
+                  <el-option label="未批改/待发布" :value="1" />
+                  <el-option label="已完成/已发布" :value="2" />
+                </el-select>
+             </div>
+             <div class="filter-row flex gap-2">
+                <el-input v-model="filters.department" placeholder="学院/部门" size="small" clearable />
+                <el-input v-model="filters.className" placeholder="班级" size="small" clearable />
+             </div>
+          </div>
+
           <div class="student-list">
             <el-empty
-              v-if="submittedList.length === 0 && !listLoading"
-              description="暂无学生提交记录，等待学生完成考试后再来批改吧"
-              :image-size="120"
-              style="padding: 40px 0;"
+              v-if="filteredList.length === 0 && !listLoading"
+              description="无匹配提交记录"
+              :image-size="80"
+              style="padding: 20px 0;"
             />
             <div v-else-if="listLoading" style="padding: 40px; text-align:center;">
               <el-icon class="is-loading" style="font-size:24px;color:#999;"><Loading /></el-icon>
             </div>
             <div
-              v-for="record in submittedList"
+              v-for="record in filteredList"
               :key="record.recordId"
               class="student-item"
               :class="{ active: selectedRecord?.recordId === record.recordId }"
@@ -40,13 +58,17 @@
             >
               <div class="student-name-row">
                 <span class="student-name">{{ record.studentName }}</span>
-                <el-tag size="small" :type="getStatusType(record.gradingStatus)">
-                  {{ getStatusLabel(record.gradingStatus) }}
+                <el-tag size="small" :type="getStatusType(record.status || 1)">
+                  {{ getStatusLabel(record.status || 1) }}
                 </el-tag>
+              </div>
+              <div class="student-info-row" v-if="record.department || record.className">
+                <span class="info-tag">{{ record.department }}</span>
+                <span class="info-tag">{{ record.className }}</span>
               </div>
               <div class="student-score-row">
                 <span>总分：<strong style="color:#3b82f6">{{ record.totalScore || 0 }}</strong></span>
-                <span v-if="record.gradingStatus === 2" style="color:#22c55e">批改完成</span>
+                <span v-if="record.status === 2" style="color:#22c55e">批改完成</span>
                 <span v-else-if="record.pendingCount > 0" style="color:#ef4444">待批改：{{ record.pendingCount }}</span>
                 <span v-else style="color:#3b82f6">批改中</span>
               </div>
@@ -63,7 +85,7 @@
                 <span style="margin-left:16px;color:#6b7280;font-size:14px;">
                   当前总分：<strong style="color:#dc2626;font-size:18px;">{{ selectedRecord.totalScore || 0 }}</strong>
                 </span>
-                <el-tag v-if="selectedRecord.gradingStatus === 2" type="success" size="small" style="margin-left:12px;">已发布</el-tag>
+                <el-tag v-if="selectedRecord.status === 2" type="success" size="small" style="margin-left:12px;">已发布</el-tag>
               </div>
               <el-button type="success" @click="handlePublishResult" :disabled="selectedRecord.gradingStatus !== 2 || selectedRecord.status === 2">发布成绩</el-button>
             </div>
@@ -128,7 +150,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowLeft, CircleCheck, CircleClose, Loading } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -142,6 +164,25 @@ const totalSubmitted = ref(0)
 const selectedRecord = ref<any>(null)
 const gradingForm = reactive<Record<number, { score: number, comment: string }>>({})
 const listLoading = ref(false)
+
+// 筛选状态
+const filters = reactive({
+  status: null as number | null,
+  department: '',
+  className: ''
+})
+
+const filteredList = computed(() => {
+  return submittedList.value.filter(r => {
+    // 1. 状态筛选
+    if (filters.status !== null && r.status !== filters.status) return false
+    // 2. 学院筛选
+    if (filters.department && !r.department?.includes(filters.department)) return false
+    // 3. 班级筛选
+    if (filters.className && !r.className?.includes(filters.className)) return false
+    return true
+  })
+})
 
 async function fetchList() {
   listLoading.value = true
@@ -203,6 +244,16 @@ async function handlePublishResult() {
   try {
     await axios.post(`/v1/grading/${selectedRecord.value.recordId}/publish`)
     ElMessage.success('成绩已发布')
+    
+    // 立即更新本地状态，触发 UI 锁定
+    if (selectedRecord.value) {
+      selectedRecord.value.status = 2
+    }
+    const inList = submittedList.value.find(r => r.recordId === selectedRecord.value.recordId)
+    if (inList) {
+      inList.status = 2
+    }
+    
     fetchList()
   } catch (err) {
     ElMessage.error('发布失败')
@@ -316,6 +367,24 @@ onMounted(() => {
   font-size: 14px;
   color: #374151;
   flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Filter Section */
+.filter-section {
+  padding: 12px 16px;
+  background: #fff;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.filter-row {
+  display: flex;
+  gap: 8px;
 }
 
 .student-list {
@@ -328,6 +397,24 @@ onMounted(() => {
   border-bottom: 1px solid #f1f5f9;
   cursor: pointer;
   transition: background 0.15s;
+}
+
+.student-info-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.info-tag {
+  font-size: 11px;
+  background: #f1f5f9;
+  color: #64748b;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
 }
 .student-item:hover { background: #eff6ff; }
 .student-item.active {

@@ -288,12 +288,33 @@ const formattedContent = computed(() => {
 async function fetchDetail() {
   loading.value = true
   try {
-    resource.value = await getResourceDetail(resourceId.value)
+    const data = await getResourceDetail(resourceId.value, { skipErrorMsg: true } as any)
+    
+    // 检查资源状态：如果已下架且非管理员/发布者，视为不可见
+    const isOffline = data.status === 3
+    const isCreator = data.creatorId == authStore.userInfo?.userId
+    const isAdmin = authStore.isAdmin
+    
+    if (isOffline && !isCreator && !isAdmin) {
+      ElMessage.warning('该资源已下架')
+      router.replace('/resource')
+      return
+    }
+
+    resource.value = data
     // 异步加载审核记录（失败不阻断页面）
     if (canEdit.value) {
       getResourceAuditLogs(resourceId.value).then((r) => { auditLogs.value = r }).catch(() => {})
     }
-  } finally { loading.value = false }
+  } catch (err: any) {
+    // 处理资源不存在或加载失败的情况
+    console.error('资源加载失败:', err)
+    // 如果拦截器已经弹窗了，这里直接带离页面
+    // 如果想要完全自定义，可以给 getResourceDetail 传参数跳过全局弹窗
+    router.replace('/resource')
+  } finally { 
+    loading.value = false 
+  }
 }
 
 // ─── 浏览行为记录（埋点 RESOURCE_VIEW） ───

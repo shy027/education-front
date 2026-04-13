@@ -22,6 +22,7 @@
 
       <div class="topic-actions">
         <el-button
+          v-if="isMember || authStore.isTeacher || authStore.isAdmin"
           :class="['like-btn', { liked: liked }]"
           :icon="liked ? StarFilled : Star"
           round
@@ -29,6 +30,7 @@
         >
           {{ post.likeCount }} 点赞
         </el-button>
+        <el-tag v-else type="info" size="small" effect="plain" style="margin-right:8px;">未加入课程不可点赞</el-tag>
         <span class="comment-count">
           <el-icon><ChatDotRound /></el-icon>{{ post.commentCount }} 条评论
         </span>
@@ -52,7 +54,7 @@
       </div>
 
       <!-- 发表评论 -->
-      <div class="comment-input-card">
+      <div v-if="isMember || authStore.isTeacher || authStore.isAdmin" class="comment-input-card">
         <el-avatar :size="36" :src="authStore.userInfo?.avatar" style="flex-shrink:0">
           {{ authStore.userInfo?.realName?.charAt(0) }}
         </el-avatar>
@@ -72,6 +74,9 @@
             </el-button>
           </div>
         </div>
+      </div>
+      <div v-else class="comment-input-card placeholder-card" style="justify-content:center; padding: 20px; background: #f8fafc; border-radius: 12px; border: 1px dashed #e2e8f0;">
+        <el-tag type="info" size="large" effect="plain">暂未加入该课程，加入后参与讨论</el-tag>
       </div>
 
       <!-- 评论列表 -->
@@ -96,14 +101,16 @@
                 :icon="c.liked ? StarFilled : Star"
                 @click="handleCommentLike(c)"
               >{{ c.likeCount }}</el-button>
-              <el-button text size="small" @click="replyTo(c)">回复</el-button>
-              <el-button
-                v-if="canDeleteComment(c)"
-                text
-                size="small"
-                type="danger"
-                @click="handleDeleteComment(c)"
-              >删除</el-button>
+              <template v-if="isMember || authStore.isTeacher || authStore.isAdmin">
+                <el-button text size="small" @click="replyTo(c)">回复</el-button>
+                <el-button
+                  v-if="canDeleteComment(c)"
+                  text
+                  size="small"
+                  type="danger"
+                  @click="handleDeleteComment(c)"
+                >删除</el-button>
+              </template>
             </div>
 
             <!-- 回复输入框 -->
@@ -161,6 +168,7 @@ import {
   getPostDetail, getCommentList, createComment, deleteComment,
   togglePostLike, toggleCommentLike, togglePostTop, togglePostEssence, deletePost,
 } from '@/api/community'
+import { checkMembership } from '@/api/course'
 import type { PostItem, CommentItem } from '@/api/community'
 
 const route = useRoute()
@@ -178,7 +186,28 @@ async function fetchPost() {
   try {
     post.value = await getPostDetail(postId)
     liked.value = !!post.value?.liked
+    
+    // 校验成员身份
+    if (post.value?.courseId) {
+      checkMemberState(post.value.courseId)
+    }
   } finally { pageLoading.value = false }
+}
+
+const isMember = ref(false)
+async function checkMemberState(courseId: string) {
+  if (authStore.isAdmin || authStore.isTeacher) {
+    // 简化处理：教师和管理员在社区默认有全权限（或者是课程教师逻辑）
+    // 如果需要严格限定只有本课教师，可以增加 isMyTeaching 逻辑，目前先按角色放开
+    isMember.value = true
+    return
+  }
+  try {
+    const res = await checkMembership(courseId, authStore.userInfo?.userId as string)
+    isMember.value = res.isMember
+  } catch {
+    isMember.value = false
+  }
 }
 
 async function handleLike() {

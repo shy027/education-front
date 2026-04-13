@@ -119,7 +119,7 @@
                 <el-icon class="mr-1"><Collection /></el-icon>题库选题
               </el-button>
               <el-button type="primary" size="large" @click="openSmartRecommend" style="background:#6366f1; border-color:#6366f1; border-radius:0.75rem; box-shadow:0 1px 2px rgba(0,0,0,0.05);">
-                <el-icon class="mr-1"><MagicStick /></el-icon>AI 智能抽题
+                <el-icon class="mr-1"><MagicStick /></el-icon>智能抽题
               </el-button>
             </div>
           </div>
@@ -395,7 +395,7 @@
       </el-dialog>
 
       <!-- 智能抽题弹窗 -->
-      <el-dialog v-model="showSmartRecommend" title="AI智能抽题" width="600px">
+      <el-dialog v-model="showSmartRecommend" title="智能抽题" width="600px">
         <el-form label-width="110px">
           <el-form-item label="题库范围">
             <el-checkbox-group v-model="recommendParams.scopes">

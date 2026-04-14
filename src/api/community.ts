@@ -73,14 +73,14 @@ export interface DocumentItem {
 
 // ===================== 讨论话题（Post）=====================
 
-export const getPostList = (params: PageQuery & { courseId: string; keyword?: string; isTop?: number; isEssence?: number }) =>
-  get<PageResponse<PostItem>>('/v1/community/posts', params)
+export const getPostList = (params: PageQuery & { courseId: string; keyword?: string; isTop?: number; isEssence?: number }, config?: any) =>
+  get<PageResponse<PostItem>>('/v1/community/posts', params, config)
 
 export const getMyPosts = (params?: PageQuery) =>
   get<PageResponse<PostItem>>('/v1/community/posts/my', params)
 
-export const getPostDetail = (postId: string) =>
-  get<PostItem>(`/v1/community/posts/${postId}`)
+export const getPostDetail = (postId: string, config?: any) =>
+  get<PostItem>(`/v1/community/posts/${postId}`, undefined, config)
 
 export const createPost = (data: { courseId: string; postTitle: string; postContent?: string }) =>
   post<PostItem>('/v1/community/posts', data)
@@ -99,8 +99,8 @@ export const togglePostEssence = (postId: string, isEssence: number) =>
 
 // ===================== 观点/评论（Comment）=====================
 
-export const getCommentList = (params: PageQuery & { postId: string; parentId?: string }) =>
-  get<PageResponse<CommentItem>>('/v1/community/comments', params)
+export const getCommentList = (params: PageQuery & { postId: string; parentId?: string }, config?: any) =>
+  get<PageResponse<CommentItem>>('/v1/community/comments', params, config)
 
 export const createComment = (data: { postId: string; commentContent: string; parentId?: string }) =>
   post<CommentItem>('/v1/community/comments', data)

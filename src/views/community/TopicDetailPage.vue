@@ -184,26 +184,28 @@ const liked = ref(false)
 async function fetchPost() {
   pageLoading.value = true
   try {
-    post.value = await getPostDetail(postId)
+    // 强制静默，防止非成员查看时弹出报错
+    post.value = await getPostDetail(postId, { skipErrorMsg: true })
     liked.value = !!post.value?.liked
     
     // 校验成员身份
     if (post.value?.courseId) {
       checkMemberState(post.value.courseId)
     }
+  } catch (err) {
+    console.error('Fetch post failed', err)
   } finally { pageLoading.value = false }
 }
 
 const isMember = ref(false)
 async function checkMemberState(courseId: string) {
   if (authStore.isAdmin || authStore.isTeacher) {
-    // 简化处理：教师和管理员在社区默认有全权限（或者是课程教师逻辑）
-    // 如果需要严格限定只有本课教师，可以增加 isMyTeaching 逻辑，目前先按角色放开
     isMember.value = true
     return
   }
   try {
-    const res = await checkMembership(courseId, authStore.userInfo?.userId as string)
+    // 静默查询，失败则视为非成员
+    const res = await checkMembership(courseId, authStore.userInfo?.userId as string, { skipErrorMsg: true })
     isMember.value = res.isMember
   } catch {
     isMember.value = false
@@ -251,9 +253,11 @@ async function fetchComments(reset = false) {
   if (reset) { commentPage.value = 1; comments.value = [] }
   commentLoading.value = true
   try {
-    const res = await getCommentList({ postId, pageNum: commentPage.value, pageSize: PAGE_SIZE })
+    const res = await getCommentList({ postId, pageNum: commentPage.value, pageSize: PAGE_SIZE }, { skipErrorMsg: true })
     comments.value = [...comments.value, ...(res.records || [])]
     commentTotal.value = res.total ?? 0
+  } catch {
+    // 失败则不展示评论
   } finally { commentLoading.value = false }
 }
 

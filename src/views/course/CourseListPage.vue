@@ -112,27 +112,7 @@
               {{ c.memberCount }}
             </div>
           </div>
-          <!-- 加入/进入按钮（仅对学生身份） -->
-          <div v-if="!authStore.isTeacher && !authStore.isAdmin" class="card-action" @click.stop>
-            <el-button
-              v-if="myCourseIds.has(String(c.id)) || activeTab === 'mine'"
-              size="small"
-              class="join-btn"
-              type="primary"
-              @click="$router.push(`/course/${c.id}`)"
-            >
-              进入课程
-            </el-button>
-            <el-button
-              v-else-if="getCalculatedStatus(c) === 'ongoing' || c.status === 1"
-              size="small"
-              class="join-btn"
-              :loading="c._joining"
-              @click="handleJoin(c)"
-            >
-              加入课程
-            </el-button>
-          </div>
+          <!-- 加入/进入按钮（已移动至详情页） -->
           <!-- 教师端：已移除查看报告按钮 -->
         </div>
       </div>
@@ -188,18 +168,6 @@ const query = reactive({
   pageSize: 12,
 })
 
-const myCourseIds = ref<Set<string>>(new Set())
-
-async function fetchMyCourseIds() {
-  if (authStore.isTeacher || authStore.isAdmin) return
-  try {
-    const res = await getMyCourses()
-    const learning = res.learning ?? []
-    myCourseIds.value = new Set(learning.map((c) => String(c.courseId ?? c.id)))
-  } catch (err) {
-    /* ignore */
-  }
-}
 
 // ───── 学科领域标签 ─────
 const subjectAreaOptions = ref<string[]>([])
@@ -389,18 +357,6 @@ function statusLabel(c: CourseItem): string {
   return '未知'
 }
 
-// ───── 加入课程 ─────
-async function handleJoin(course: CourseItem & { _joining?: boolean }) {
-  course._joining = true
-  try {
-    await joinCourse(course.id)
-    ElMessage.success('加入成功，快去学习吧！')
-    myCourseIds.value.add(course.id)
-    router.push(`/course/${course.id}`)
-  } finally {
-    course._joining = false
-  }
-}
 
 const creating = ref(false)
 
@@ -430,7 +386,6 @@ async function handleCreate() {
 
 onMounted(() => {
   fetchSubjects()
-  fetchMyCourseIds()
   fetchList()
 })
 </script>

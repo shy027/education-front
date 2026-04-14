@@ -23,21 +23,41 @@
         </div>
         <!-- 操作区 -->
         <div class="hero-actions">
-          <!-- 加入/退出：仅学生可见，教师（无论是否是该课程创建者）均不显示 -->
-          <el-button
-            v-if="!authStore.isTeacher && !authStore.isAdmin && !isMember && !isCourseFinished"
-            type="primary"
-            class="join-btn"
-            :loading="joining"
-            @click="handleJoin"
-          >加入课程</el-button>
-          <el-button
-            v-if="!authStore.isTeacher && !authStore.isAdmin && isMember && !isCourseFinished"
-            type="danger"
-            plain
-            :loading="quitting"
-            @click="handleQuit"
-          >退出课程</el-button>
+          <!-- 加入/退出：仅学生可见 -->
+          <template v-if="!authStore.isTeacher && !authStore.isAdmin && !isCourseFinished">
+            <!-- 未加入或申请被拒绝：显示加入/申请按钮 -->
+            <el-button
+              v-if="userJoinStatus === null || userJoinStatus === 2 || userJoinStatus === 3"
+              type="primary"
+              class="join-btn"
+              :loading="joining"
+              @click="handleJoin"
+            >
+              {{ course.joinType === 1 ? '加入课程' : '申请加入' }}
+            </el-button>
+
+            <!-- 申请中：显示禁用按钮 -->
+            <el-button
+              v-else-if="userJoinStatus === 0"
+              type="warning"
+              plain
+              disabled
+              class="join-btn"
+            >
+              申请中
+            </el-button>
+
+            <!-- 已加入：显示退出按钮 -->
+            <el-button
+              v-else-if="userJoinStatus === 1"
+              type="danger"
+              plain
+              :loading="quitting"
+              @click="handleQuit"
+            >
+              退出课程
+            </el-button>
+          </template>
           <template v-if="authStore.isTeacher && isMyTeaching">
             <!-- 草稿状态下的操作按钮 -->
             <template v-if="course.auditStatus === -1 || course.auditStatus === 2">
@@ -73,6 +93,13 @@
                 @click="$router.push({ path: '/report', query: { courseId: course.id } })"
               >查看教学报告</el-button>
               
+              <el-button
+                type="primary"
+                plain
+                :icon="UserFilled"
+                @click="openMemberDialog"
+              >成员管理</el-button>
+
               <!-- 快捷上下架控制 (仅管理员可见) -->
               <template v-if="authStore.isAdmin">
                 <el-button
@@ -304,7 +331,7 @@
 
                 <!-- 学生视图 -->
                 <template v-if="!isMyTeaching">
-                   <template v-if="isMember && !isCourseFinished">
+                   <template v-if="userJoinStatus === 1 && !isCourseFinished">
                      <!-- 1. 考试/测验 (2/3) 简化单按钮逻辑 -->
                      <template v-if="t.taskType === 2 || t.taskType === 3">
                        <div class="flex items-center gap-2">
@@ -367,9 +394,10 @@
                      </el-button>
                    </template>
 
-                   <!-- 非成员提示 -->
-                   <template v-else-if="!isMember && !authStore.isAdmin">
-                     <el-tag type="info" size="small" effect="plain">暂未加入该课程</el-tag>
+                   <!-- 非成员/审批中提示 -->
+                   <template v-else-if="!authStore.isTeacher && !authStore.isAdmin">
+                     <el-tag v-if="userJoinStatus === 0" type="warning" size="small" effect="plain">加入申请审批中</el-tag>
+                     <el-tag v-else type="info" size="small" effect="plain">加入课程后即可参加任务</el-tag>
                    </template>
                 </template>
               </div>
@@ -807,6 +835,91 @@
       </template>
     </el-dialog>
 
+    <!-- 成员管理对话框 -->
+    <el-dialog v-model="showMemberDialog" title="课程成员管理" width="850px" class="member-dialog">
+      <div class="member-mgmt-container" v-loading="memberLoading">
+        <div class="member-toolbar">
+          <div class="toolbar-left">
+            <el-input 
+              v-model="memberQuery.keyword" 
+              placeholder="搜索姓名/账号..." 
+              style="width: 200px" 
+              clearable 
+              @keyup.enter="fetchMembers" 
+              @clear="fetchMembers"
+            >
+              <template #prefix><el-icon><Search /></el-icon></template>
+            </el-input>
+            <el-select v-model="memberQuery.joinStatus" placeholder="加入状态" clearable style="width: 100px" @change="fetchMembers">
+              <el-option label="待审批" :value="0" />
+              <el-option label="已进入" :value="1" />
+              <el-option label="已拒绝" :value="2" />
+            </el-select>
+            <el-select v-model="memberQuery.department" placeholder="全部学院" style="width: 150px" clearable @change="fetchMembers">
+              <el-option v-for="dept in filterOptions.departments" :key="dept" :label="dept" :value="dept" />
+            </el-select>
+            <el-select v-model="memberQuery.className" placeholder="全部班级" style="width: 140px" clearable @change="fetchMembers">
+              <el-option v-for="cls in filterOptions.classNames" :key="cls" :label="cls" :value="cls" />
+            </el-select>
+          </div>
+        </div>
+
+        <el-table :data="memberList" stripe border style="width: 100%">
+          <el-table-column label="成员" min-width="180">
+            <template #default="{ row }">
+              <div class="member-user-info">
+                <el-avatar :size="32" :src="row.avatar">{{ row.realName?.charAt(0) || row.username?.charAt(0) }}</el-avatar>
+                <div class="user-text">
+                  <div class="user-name">{{ row.realName || row.username }}</div>
+                  <div class="user-account">@{{ row.username }}</div>
+                </div>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="角色" width="100">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.memberRole === 1 ? 'danger' : (row.memberRole === 2 ? 'warning' : 'info')">
+                {{ { 1: '教师', 2: '助教', 3: '学生' }[row.memberRole as number] || '学生' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag size="small" :type="row.joinStatus === 1 ? 'success' : (row.joinStatus === 0 ? 'warning' : 'danger')">
+                {{ { 1: '已通过', 0: '待审批', 2: '已拒绝' }[row.joinStatus as number] || '未知' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="加入时间" width="120">
+            <template #default="{ row }">{{ formatDate(row.joinTime) }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="180" align="center" fixed="right">
+            <template #default="{ row }">
+              <template v-if="row.joinStatus === 0">
+                <el-button type="success" size="small" text @click="handleApprove(row.userId, true)">同意</el-button>
+                <el-button type="danger" size="small" text @click="handleApprove(row.userId, false)">拒绝</el-button>
+              </template>
+              <template v-else-if="row.memberRole !== 1">
+                <el-button type="danger" size="small" text @click="handleRemoveMember(row)">移除</el-button>
+              </template>
+              <span v-else>—</span>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div class="member-footer">
+          <el-pagination
+            v-model:current-page="memberQuery.pageNum"
+            :page-size="memberQuery.pageSize"
+            :total="memberTotal"
+            layout="total, prev, pager, next"
+            background
+            @current-change="fetchMembers"
+          />
+        </div>
+      </div>
+    </el-dialog>
+
     <!-- 添加章节对话框 -->
     <el-dialog v-model="showAddChapterDialog" title="添加章节" width="400px" @closed="resetChapterForm">
       <el-form :model="chapterForm" label-width="80px" size="large" @submit.prevent="handleCreateChapter">
@@ -867,6 +980,11 @@ import {
   updateCourseStatus,
   checkMembership,
   startExam,
+  getMemberList,
+  approveMember,
+  removeMember,
+  getMemberFilterOptions,
+  type MemberItem,
 } from '@/api/course'
 import type { PageResponse } from '@/types/api'
 import { getPostList, createPost, type PostItem } from '@/api/community'
@@ -891,6 +1009,7 @@ const courseId = computed(() => route.params.id as string)
 const pageLoading = ref(false)
 const course = ref<CourseItem | null>(null)
 const isMember = ref(false)
+const userJoinStatus = ref<number | null>(null) // 0=待审批 1=已通过 2=已拒绝 null=未申请
 const joining = ref(false)
 const quitting = ref(false)
 const showEditDialog = ref(false)
@@ -1056,7 +1175,8 @@ const canInteract = computed(() => {
   if (isCourseFinished.value) return false
   if (authStore.isAdmin) return true
   if (authStore.isTeacher && isMyTeaching.value) return true
-  if (!authStore.isTeacher && !authStore.isAdmin && isMember.value) return true
+  // 学生只有在审核通过 (userJoinStatus === 1) 后才能互动
+  if (!authStore.isTeacher && !authStore.isAdmin && userJoinStatus.value === 1) return true
   return false
 })
 
@@ -1102,11 +1222,31 @@ async function handleJoin() {
   joining.value = true
   try {
     await joinCourse(courseId.value)
-    isMember.value = true
-    ElMessage.success('加入成功！')
-    if (course.value) {
-      course.value.studentCount = (course.value.studentCount ?? course.value.memberCount ?? 0) + 1
-      course.value.memberCount = course.value.studentCount
+    
+    // 如果是审批加入课程 (joinType !== 1)，先立即在前端显示为“申请中”
+    if (course.value?.joinType !== 1) {
+      userJoinStatus.value = 0
+      ElMessage.success('申请提交成功，请等待教师审批')
+    } else {
+      // 公开加入则直接设为成功
+      userJoinStatus.value = 1
+      ElMessage.success('加入成功！')
+      if (course.value) {
+        course.value.studentCount = (course.value.studentCount ?? course.value.memberCount ?? 0) + 1
+        course.value.memberCount = course.value.studentCount
+      }
+      Promise.allSettled([fetchChapters(), fetchWares(), fetchAnnouncements()])
+    }
+
+    // 随后刷新一次真实的后端状态，确保万无一失
+    await refreshMembership()
+  } catch (err: any) {
+    // 即使失败，也尝试静默刷新一次状态，防止状态不同步
+    await refreshMembership()
+    if (err.message?.includes('已经加入')) {
+      /* ignore */
+    } else {
+      ElMessage.error(err.message || '操作失败')
     }
   } finally { joining.value = false }
 }
@@ -1116,13 +1256,43 @@ async function handleQuit() {
   quitting.value = true
   try {
     await quitCourse(courseId.value)
-    isMember.value = false
     ElMessage.success('已退出课程')
-    if (course.value) {
-      course.value.studentCount = Math.max(0, (course.value.studentCount ?? course.value.memberCount ?? 1) - 1)
-      course.value.memberCount = course.value.studentCount
+  } catch (err: any) {
+    if (err.message?.includes('未加入')) {
+      // 已经在外部被移出或退出，直接刷新状态即可
+    } else {
+      ElMessage.error(err.message || '退出失败')
     }
-  } finally { quitting.value = false }
+  } finally { 
+    await refreshMembership()
+    // 根据最新状态更新人数（仅在此处做大致本地同步，最准的是重新请求课程详情）
+    if (userJoinStatus.value === null || userJoinStatus.value === 2) {
+      if (course.value) {
+        course.value.studentCount = Math.max(0, (course.value.studentCount ?? course.value.memberCount ?? 1) - 1)
+        course.value.memberCount = course.value.studentCount
+      }
+    }
+    quitting.value = false 
+  }
+}
+
+/** 刷新学生成员状态 */
+async function refreshMembership() {
+  if (authStore.isTeacher || authStore.isAdmin || !authStore.userInfo?.userId) return
+  try {
+    // 强制静默，防止初始加载时报错
+    const res = await checkMembership(courseId.value, authStore.userInfo.userId, { skipErrorMsg: true })
+    if (res) {
+      userJoinStatus.value = res.joinStatus !== undefined ? res.joinStatus : 1
+      isMember.value = res.joinStatus === 1
+    } else {
+      userJoinStatus.value = null
+      isMember.value = false
+    }
+  } catch (err) {
+    isMember.value = false
+    userJoinStatus.value = null
+  }
 }
 
 // ───── 课程基本信息编辑 ─────
@@ -1309,11 +1479,14 @@ const showAddChapterDialog = ref(false)
 const showAddWareDialog = ref(false)
 
 async function fetchChapters() {
-  const result = await getChapterTree(courseId.value)
-  chapters.value = result || []
-  // 若当前未选中章节，则刷新全局聚合资源
-  if (!selectedChapterId.value) {
-    aggregateAllResources()
+  try {
+    const result = await getChapterTree(courseId.value, { skipErrorMsg: true })
+    chapters.value = result || []
+    if (!selectedChapterId.value) {
+      aggregateAllResources()
+    }
+  } catch {
+    chapters.value = []
   }
 }
 
@@ -1343,7 +1516,7 @@ function aggregateAllResources() {
 async function fetchWares(chapterId?: string) {
   wareLoading.value = true
   try {
-    const res = await getChapterCoursewares(courseId.value as string, chapterId)
+    const res = await getChapterCoursewares(courseId.value as string, chapterId, 1, 100, { skipErrorMsg: true })
     wares.value = res?.list || res?.records || []
   } catch {
     wares.value = []
@@ -1480,6 +1653,10 @@ async function handleAiRecommendByFile(options: any) {
 }
 
 function openChapterResource(res: ChapterResourceItem) {
+  if (!canInteract.value) {
+    if (userJoinStatus.value === 0) return ElMessage.warning('加入申请审批中，通过后可查看')
+    return ElMessage.warning('请先加入课程')
+  }
   // 统一跳转至资源详情页供在线预览，避免直接 window.open 触发附件自动下载
   router.push(`/resource/${res.resourceId}`)
 }
@@ -1524,6 +1701,10 @@ function wareAuditLabel(status: number): string {
 }
 
 function openWare(w: CoursewareItem) {
+  if (!canInteract.value) {
+    if (userJoinStatus.value === 0) return ElMessage.warning('加入申请中，通过后可学习')
+    return ElMessage.warning('请先加入课程')
+  }
   // 保存选中的课件，触发展示预览区域
   selectedWareId.value = w.id
   selectedWare.value = w
@@ -1655,8 +1836,10 @@ function taskStatusLabel(s: number): string { return ({ 0: '草稿', 1: '进行�
 async function fetchTasks() {
   taskLoading.value = true
   try {
-    const res = await getTaskList(courseId.value, { pageSize: 50 })
+    const res = await getTaskList(courseId.value, { pageSize: 50 }, { skipErrorMsg: true })
     tasks.value = res?.list || res?.records || []
+  } catch {
+    tasks.value = []
   } finally { taskLoading.value = false }
 }
 
@@ -1794,8 +1977,10 @@ const postForm = reactive({ postTitle: '', postContent: '' })
 async function fetchPosts() {
   postLoading.value = true
   try {
-    const res = await getPostList({ courseId: courseId.value, ...postQuery })
+    const res = await getPostList({ courseId: courseId.value, ...postQuery }, { skipErrorMsg: true })
     posts.value = { ...res, list: res?.list || res?.records || [] }
+  } catch {
+    posts.value = { list: [], total: 0, pageNum: 1, pageSize: 10 }
   } finally { postLoading.value = false }
 }
 
@@ -1823,8 +2008,10 @@ const selectedNotice = ref<AnnouncementItem | null>(null)
 async function fetchAnnouncements() {
   noticeLoading.value = true
   try {
-    const res = await getAnnouncementList(courseId.value, { pageSize: 50 })
+    const res = await getAnnouncementList(courseId.value, { pageSize: 50 }, { skipErrorMsg: true })
     announcements.value = res?.list || res?.records || []
+  } catch {
+    announcements.value = []
   } finally { noticeLoading.value = false }
 }
 
@@ -1854,33 +2041,116 @@ async function deleteNoticeById(id: string) {
   ElMessage.success('已删除')
 }
 
+// ───── 成员管理 ─────
+const showMemberDialog = ref(false)
+const memberLoading = ref(false)
+const memberList = ref<MemberItem[]>([])
+const memberTotal = ref(0)
+const memberQuery = reactive({
+  pageNum: 1,
+  pageSize: 10,
+  keyword: '',
+  joinStatus: undefined as number | undefined,
+  department: '',
+  className: ''
+})
+
+const filterOptions = reactive({
+  departments: [] as string[],
+  classNames: [] as string[]
+})
+
+async function fetchFilterOptions() {
+  try {
+    const res = await getMemberFilterOptions(courseId.value)
+    filterOptions.departments = res.departments || []
+    filterOptions.classNames = res.classNames || []
+  } catch (e) {
+    console.error('加载成员筛选选项失败', e)
+  }
+}
+
+async function openMemberDialog() {
+  showMemberDialog.value = true
+  fetchFilterOptions()
+  fetchMembers()
+}
+
+async function fetchMembers() {
+  memberLoading.value = true
+  try {
+    const res = await getMemberList(courseId.value, memberQuery)
+    memberList.value = res.list || res.records || []
+    memberTotal.value = res.total || 0
+  } catch (error) {
+    ElMessage.error('获取成员列表失败')
+  } finally {
+    memberLoading.value = false
+  }
+}
+
+async function handleApprove(userId: string, approved: boolean) {
+  try {
+    await approveMember(courseId.value, userId, approved)
+    ElMessage.success(approved ? '已同意加入' : '已拒绝申请')
+    fetchMembers()
+    // 更新课程参与人数显示
+    if (approved && course.value) {
+      course.value.studentCount = (course.value.studentCount ?? course.value.memberCount ?? 0) + 1
+      course.value.memberCount = course.value.studentCount
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || '操作失败')
+  }
+}
+
+async function handleRemoveMember(row: MemberItem) {
+  try {
+    await ElMessageBox.confirm(`确定要将成员 ${row.realName || row.username} 移出课程吗？`, '移除成员', {
+      type: 'warning',
+      confirmButtonText: '确定移除',
+      cancelButtonText: '取消'
+    })
+    
+    await removeMember(courseId.value, row.userId)
+    ElMessage.success('移除成功')
+    fetchMembers()
+    if (course.value) {
+      course.value.studentCount = Math.max(0, (course.value.studentCount ?? course.value.memberCount ?? 1) - 1)
+      course.value.memberCount = course.value.studentCount
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '移除失败')
+    }
+  }
+}
+
 // ───── 初始化 ─────
 onMounted(async () => {
   pageLoading.value = true
   try {
-    const [detail] = await Promise.all([
-      getCourseDetail(courseId.value),
+    // 1. 优先加载基础信息
+    course.value = await getCourseDetail(courseId.value)
+    
+    // 2. 检查权限状态 (非老师/管理员才需要检查学生加入状态)
+    await refreshMembership()
+
+    // 3. 全局加载数据 (章节、课件、公告等)
+    // 根据用户最新反馈：允许所有人在详情页预览课程大纲和内容，但互动仍受限
+    // 这里使用 Promise.allSettled 确保即便非成员访问部分接口报错 403，也不会影响页面基础信息的展示
+    Promise.allSettled([
       fetchChapters(),
       fetchWares(),
       fetchAnnouncements(),
     ])
-    course.value = detail
-
-    // 教师/管理员不涉及加入退出，学生通过 getMyCourses 判断是否已加入
-    if (!authStore.isTeacher && !authStore.isAdmin) {
-      try {
-        const myData = await getMyCourses()
-        const joined = myData.learning ?? []
-        isMember.value = joined.some((c: any) => String(c.courseId ?? c.id) === courseId.value)
-      } catch {
-        isMember.value = false
-      }
-    }
     
-    // 弹出全局系统提示
+    // 4. 全局系统提示
     if (isCourseFinished.value) {
       ElMessage.warning('该课程已经结课')
     }
+  } catch (err: any) {
+    console.error('Course detail init failed:', err)
   } finally {
     pageLoading.value = false
   }
@@ -2360,6 +2630,16 @@ onMounted(async () => {
 .recommend-header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
 .rec-title { font-weight: 600; font-size: 14px; color: #263238; }
 .rec-reason { font-size: 12px; color: #78909c; }
+
+/* 成员管理弹窗样式 */
+.member-mgmt-container { min-height: 400px; padding: 10px 0; }
+.member-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; gap: 16px; }
+.toolbar-left { display: flex; gap: 12px; }
+.member-user-info { display: flex; align-items: center; gap: 12px; }
+.member-user-info .user-text { display: flex; flex-direction: column; }
+.member-user-info .user-name { font-size: 14px; font-weight: 600; color: #263238; }
+.member-user-info .user-account { font-size: 12px; color: #90a4ae; }
+.member-footer { margin-top: 20px; display: flex; justify-content: flex-end; }
 
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(10px); }

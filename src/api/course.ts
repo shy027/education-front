@@ -143,7 +143,7 @@ export interface MemberItem {
   avatar?: string
   memberRole: number      // 1=教师 2=助教 3=学生
   joinStatus: number      // 0=待审批 1=已通过 2=已拒绝
-  joinedTime: string
+  joinTime: string
 }
 
 export interface FileUploadResult {
@@ -162,8 +162,8 @@ export function getPublishedCourses() {
 export const getCourseList = (params: CourseQuery) =>
   get<PageResponse<CourseItem>>('/v1/courses', params)
 
-export const getCourseDetail = (id: string) =>
-  get<CourseItem>(`/v1/courses/${id}`)
+export const getCourseDetail = (id: string, config?: any) =>
+  get<CourseItem>(`/v1/courses/${id}`, undefined, config)
 
 export const createCourse = (data: CourseCreateReq) =>
   post<string>('/v1/courses', data)
@@ -200,8 +200,8 @@ export const deleteCourseDraft = (id: string) =>
 
 // ===================== 章节 =====================
 
-export const getChapterTree = (courseId: string) =>
-  get<ChapterNode[]>(`/v1/courses/${courseId}/chapters/tree`)
+export const getChapterTree = (courseId: string, config?: any) =>
+  get<ChapterNode[]>(`/v1/courses/${courseId}/chapters/tree`, undefined, config)
 
 export const createChapter = (courseId: string, data: { chapterName: string; parentId?: string; sortOrder?: number; courseId?: string }) =>
   post<string>(`/v1/courses/${courseId}/chapters`, { ...data, courseId })
@@ -227,11 +227,11 @@ export const unbindChapterResource = (courseId: string, chapterId: string, resou
 
 // ===================== 课件 =====================
 
-export const getCoursewareList = (courseId: string, params?: PageQuery & { chapterId?: string; wareType?: number }) =>
-  get<PageResponse<CoursewareItem>>(`/v1/courses/${courseId}/coursewares`, params)
+export const getCoursewareList = (courseId: string, params?: PageQuery & { chapterId?: string; wareType?: number }, config?: any) =>
+  get<PageResponse<CoursewareItem>>(`/v1/courses/${courseId}/coursewares`, params, config)
 
-export const getChapterCoursewares = (courseId: string, chapterId?: string, pageNum = 1, pageSize = 100) =>
-  get<PageResponse<CoursewareItem>>(`/v1/courses/${courseId}/coursewares`, { chapterId, pageNum, pageSize })
+export const getChapterCoursewares = (courseId: string, chapterId?: string, pageNum = 1, pageSize = 100, config?: any) =>
+  get<PageResponse<CoursewareItem>>(`/v1/courses/${courseId}/coursewares`, { chapterId, pageNum, pageSize }, config)
 
 export const createCourseware = (courseId: string, data: Record<string, unknown>) =>
   post<string>(`/v1/courses/${courseId}/coursewares`, data)
@@ -252,8 +252,8 @@ export const uploadCoursewareFile = (type: 'video' | 'pdf' | 'audio' | 'ppt' | '
 
 // ===================== 任务 =====================
 
-export const getTaskList = (courseId: string, params?: PageQuery) =>
-  get<PageResponse<TaskItem>>(`/v1/courses/${courseId}/tasks`, params)
+export const getTaskList = (courseId: string, params?: PageQuery, config?: any) =>
+  get<PageResponse<TaskItem>>(`/v1/courses/${courseId}/tasks`, params, config)
 
 export const getTaskDetail = (courseId: string, id: string) =>
   get<TaskItem>(`/v1/courses/${courseId}/tasks/${id}`)
@@ -281,16 +281,25 @@ export const joinCourse = (courseId: string) =>
 export const quitCourse = (courseId: string) =>
   del<void>(`/v1/courses/${courseId}/quit`)
 
-export const approveMember = (courseId: string, userId: string, approve: boolean, reason?: string) =>
-  put<void>(`/v1/courses/${courseId}/members/${userId}/approve`, { approve, reason })
+export const removeMember = (courseId: string, userId: string) =>
+  del<void>(`/v1/courses/${courseId}/members/${userId}`)
 
-export const checkMembership = (courseId: string, userId: string) =>
-  get<{ isMember: boolean; memberRole?: number; joinStatus?: number }>(`/v1/courses/${courseId}/members/check`, { userId })
+/**
+ * 获取成员筛选选项 (去重后的学院和班级)
+ */
+export const getMemberFilterOptions = (courseId: string | number) =>
+  get<{ departments: string[], classNames: string[] }>(`/v1/courses/${courseId}/members/filter-options`)
+
+export const approveMember = (courseId: string, userId: string, approved: boolean, remark?: string) =>
+  put<void>(`/v1/courses/${courseId}/members/${userId}/approve`, { approved, remark })
+
+export const checkMembership = (courseId: string, userId: string, config?: any) =>
+  get<{ id?: number; userId?: number; username?: string; realName?: string; avatar?: string; memberRole?: number; joinStatus?: number } | null>(`/v1/courses/${courseId}/members/check`, { userId }, config)
 
 // ===================== 公告 =====================
 
-export const getAnnouncementList = (courseId: string, params?: PageQuery & { keyword?: string; isTop?: number }) =>
-  get<PageResponse<AnnouncementItem>>(`/v1/courses/${courseId}/announcements`, params)
+export const getAnnouncementList = (courseId: string, params?: PageQuery & { keyword?: string; isTop?: number }, config?: any) =>
+  get<PageResponse<AnnouncementItem>>(`/v1/courses/${courseId}/announcements`, params, config)
 
 export const getAnnouncementDetail = (courseId: string, id: string) =>
   get<AnnouncementItem>(`/v1/courses/${courseId}/announcements/${id}`)

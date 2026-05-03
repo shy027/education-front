@@ -163,7 +163,7 @@ const canManage = computed(() =>
 )
 
 function handleManage() {
-  router.push('/admin/schools')
+  router.push('/admin/school-info')
 }
 
 // ── 申请加入 ──

@@ -190,7 +190,7 @@
                 <div class="ware-info">
                   <div class="ware-title">{{ w.wareTitle }}</div>
                   <div class="ware-meta">
-                    <el-tag size="small" :type="wareAuditType(w.auditStatus)">{{ wareAuditLabel(w.auditStatus) }}</el-tag>
+                    <el-tag v-if="isMyTeaching || authStore.isAdmin" size="small" :type="wareAuditType(w.auditStatus)">{{ wareAuditLabel(w.auditStatus) }}</el-tag>
                     <span v-if="w.duration">{{ Math.floor(w.duration / 60) }}min</span>
                   </div>
                 </div>
@@ -312,7 +312,7 @@
                 <div class="task-meta">
                   <span v-if="t.endTime">截止：{{ t.endTime.slice(0, 10) }}</span>
                   <span v-if="t.totalScore">满分：{{ t.totalScore }} 分</span>
-                  <el-tag size="small" :type="taskStatusType(t.status)">{{ taskStatusLabel(t.status) }}</el-tag>
+                  <el-tag size="small" :type="taskStatusType(t)">{{ taskStatusLabel(t) }}</el-tag>
                 </div>
               </div>
               <div class="task-actions">
@@ -1830,8 +1830,16 @@ function resetTaskForm() {
   Object.assign(taskForm, { taskTitle: '', taskType: 1, totalScore: 100, startTime: '', endTime: '', taskDescription: '' })
 }
 
-function taskStatusType(s: number): '' | 'info' | 'success' | 'warning' { return ({ 0: 'info', 1: 'success', 2: 'warning' } as Record<number, '' | 'info' | 'success' | 'warning'>)[s] ?? 'info' }
-function taskStatusLabel(s: number): string { return ({ 0: '草稿', 1: '进行中', 2: '已结束' } as Record<number, string>)[s] ?? '—' }
+function taskStatusType(t: TaskItem): '' | 'info' | 'success' | 'warning' { 
+  if (t.status === 0) return 'info'
+  if (t.status === 2 || (t.status === 1 && t.endTime && new Date(t.endTime) < new Date())) return 'warning'
+  return 'success' 
+}
+function taskStatusLabel(t: TaskItem): string { 
+  if (t.status === 0) return '草稿'
+  if (t.status === 2 || (t.status === 1 && t.endTime && new Date(t.endTime) < new Date())) return '已结束'
+  return '进行中' 
+}
 
 async function fetchTasks() {
   taskLoading.value = true

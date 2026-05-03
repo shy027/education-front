@@ -206,7 +206,7 @@ async function checkMemberState(courseId: string) {
   try {
     // 静默查询，失败则视为非成员
     const res = await checkMembership(courseId, authStore.userInfo?.userId as string, { skipErrorMsg: true })
-    isMember.value = res.isMember
+    isMember.value = !!res && res.joinStatus === 1
   } catch {
     isMember.value = false
   }

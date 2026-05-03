@@ -95,7 +95,7 @@
                     <span>上传 Logo</span>
                   </div>
                 </el-upload>
-                <p class="upload-tip">建议尺寸 200x200px，支持 JPG/PNG/WebP</p>
+                <p class="upload-tip">建议尺寸 200x200px，支持 JPG/PNG</p>
               </div>
             </el-card>
 

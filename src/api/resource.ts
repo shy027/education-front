@@ -167,3 +167,9 @@ export const uploadResourcePdf = (file: File) => {
   form.append('file', file)
   return upload<{ fileUrl: string; fileName: string; fileSize: number }>('/v1/upload/pdf', form)
 }
+
+export const uploadResourceAudio = (file: File) => {
+  const form = new FormData()
+  form.append('file', file)
+  return upload<{ fileUrl: string; fileName: string; fileSize: number }>('/v1/upload/audio', form)
+}

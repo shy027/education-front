@@ -72,7 +72,7 @@
               <span>上传封面</span>
             </div>
           </el-upload>
-          <div class="upload-tip">建议尺寸 720×480，支持 jpg/png/webp，≤5MB</div>
+          <div class="upload-tip">建议尺寸 720×480，支持 jpg/png/webp，≤10MB</div>
         </el-form-item>
 
         <!-- 挂图上传（多图） -->
@@ -83,6 +83,7 @@
             :http-request="handleCustomImageUpload"
             :on-remove="handleRemoveImage"
             :limit="9"
+            :before-upload="handleMultiImageBeforeUpload"
             accept="image/*"
           >
             <el-icon><Plus /></el-icon>
@@ -171,7 +172,7 @@ import { useAuthStore } from '@/stores/auth'
 import {
   createResource, updateResource, getResourceDetail,
   submitResourceForAudit, getCategoryTree, getEnabledTags,
-  uploadResourceImage, uploadResourceVideo, uploadResourcePdf,
+  uploadResourceImage, uploadResourceVideo, uploadResourcePdf, uploadResourceAudio,
 } from '@/api/resource'
 import type { CategoryNode, TagItem, ResourceCreateReq } from '@/api/resource'
 
@@ -201,10 +202,10 @@ const fileAccept = computed(() => {
 
 const fileTypeTip = computed(() => {
   return {
-    1: '支持 mp4/avi/mov，建议 ≤500MB',
-    2: '支持 mp4/avi/mov，建议 ≤500MB',
-    3: '仅支持 PDF 格式，建议 ≤50MB',
-    4: '支持 mp3/m4a/wav，建议 ≤100MB',
+    1: '支持 mp4/avi/mov/wmv/flv/mkv，建议 ≤200MB',
+    2: '支持 mp4/avi/mov/wmv/flv/mkv，建议 ≤200MB',
+    3: '仅支持 PDF 格式，建议 ≤10MB',
+    4: '支持 mp3/m4a/wav/aac/flac/ogg，建议 ≤200MB',
     5: '支持 jpg/png/webp，最多 9 张',
   }[form.resourceType] ?? ''
 })
@@ -228,6 +229,14 @@ const form = reactive<ResourceCreateReq & { resourceType: number }>({
 
 // ─── 挂图多图上传 ───
 const imageFileList = ref<any[]>([])
+
+async function handleMultiImageBeforeUpload(file: UploadRawFile) {
+  if (file.size > 10 * 1024 * 1024) {
+    ElMessage.error('每张图片不能超过 10MB')
+    return false
+  }
+  return true
+}
 
 async function handleCustomImageUpload(options: any) {
   try {
@@ -275,7 +284,7 @@ const enabledTags = ref<TagItem[]>([])
 
 // ─── 封面上传 ───
 async function handleCoverUpload(file: UploadRawFile) {
-  if (file.size > 5 * 1024 * 1024) { ElMessage.error('封面图不超过 5MB'); return false }
+  if (file.size > 10 * 1024 * 1024) { ElMessage.error('封面图不超过 10MB'); return false }
   try {
     const res = await uploadResourceImage(file)
     form.coverUrl = res.fileUrl
@@ -285,14 +294,23 @@ async function handleCoverUpload(file: UploadRawFile) {
 
 // ─── 文件上传 ───
 async function handleFileUpload(file: UploadRawFile) {
+  const type = form.resourceType
+  let maxSize = 10
+  if (type === 1 || type === 2 || type === 4) maxSize = 200
+  
+  if (file.size / 1024 / 1024 > maxSize) {
+    ElMessage.error(`文件大小不能超过 ${maxSize}MB!`)
+    return false
+  }
+
   uploadProgress.value = 10
   try {
     let url = ''
-    if (form.resourceType === 1 || form.resourceType === 2) {
+    if (type === 1 || type === 2) {
       const res = await uploadResourceVideo(file)
       url = res.fileUrl
-    } else if (form.resourceType === 4) {
-      const res = await uploadResourceVideo(file)   // 音频复用 video 接口或专用接口
+    } else if (type === 4) {
+      const res = await uploadResourceAudio(file)
       url = res.fileUrl
     } else {
       const res = await uploadResourcePdf(file)

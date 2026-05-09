@@ -326,8 +326,8 @@ async function handleAvatarUpload(file: UploadRawFile) {
     ElMessage.error('请上传 JPG / PNG / WebP / GIF 格式图片')
     return false
   }
-  if (file.size > 5 * 1024 * 1024) {
-    ElMessage.error('头像文件不能超过 5MB')
+  if (file.size > 10 * 1024 * 1024) {
+    ElMessage.error('头像文件不能超过 10MB')
     return false
   }
   try {

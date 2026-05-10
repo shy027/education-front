@@ -365,20 +365,19 @@ async function handleCreate() {
     ElMessage.error('该账号未绑定学校，无法创建课程')
     return
   }
-
+  
   creating.value = true
   try {
     const courseId = await createCourse({
-      courseName: '', // 空记录
-      schoolId: authStore.userInfo.schoolId,
+      courseName: '新课程',
+      subjectArea: '',
       joinType: 1,
-      dimensionWeights: '{}',
-      scoringConfig: '{}'
-    })
-    ElMessage.success('已进入课程编辑模式')
+      schoolId: authStore.userInfo?.schoolId
+    } as any)
+    ElMessage.success('课程创建成功')
     router.push(`/course/${courseId}`)
-  } catch (err) {
-    ElMessage.error('创建失败')
+  } catch (error: any) {
+    ElMessage.error(error.message || '创建课程失败')
   } finally {
     creating.value = false
   }

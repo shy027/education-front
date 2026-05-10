@@ -1002,8 +1002,8 @@ import { getAllEnabledSubjects } from '@/api/subject'
 
 const route = useRoute()
 const router = useRouter()
+const courseId = ref(route.params.id as string)
 const authStore = useAuthStore()
-const courseId = computed(() => route.params.id as string)
 
 // ───── 课程基本信息 ─────
 const pageLoading = ref(false)
@@ -1379,8 +1379,7 @@ async function handleEditCourse() {
     const weights: Record<string, number> = {}
     selectedDimensions.value.forEach(dim => { weights[dim] = 1 })
 
-    await updateCourse({
-      id: courseId.value,
+    const payload = {
       courseName: editForm.courseName,
       courseIntro: editForm.courseIntro, 
       courseCover: editForm.courseCover,
@@ -1390,12 +1389,19 @@ async function handleEditCourse() {
       startTime: editForm.startTime,
       endTime: editForm.endTime || undefined,
       dimensionWeights: JSON.stringify(weights),
-      scoringConfig: '{}' // 全局配置，发送空JSON对象以兼容MySQL JSON类型
+      scoringConfig: '{}'
+    }
+
+    await updateCourse({
+      id: courseId.value,
+      ...payload
     })
     ElMessage.success('保存成功')
     showEditDialog.value = false
     // 刷新展示
     course.value = await getCourseDetail(courseId.value)
+  } catch (err: any) {
+    ElMessage.error(err.message || '保存失败')
   } finally {
     editSubmitting.value = false
   }
@@ -2145,8 +2151,6 @@ onMounted(async () => {
     await refreshMembership()
 
     // 3. 全局加载数据 (章节、课件、公告等)
-    // 根据用户最新反馈：允许所有人在详情页预览课程大纲和内容，但互动仍受限
-    // 这里使用 Promise.allSettled 确保即便非成员访问部分接口报错 403，也不会影响页面基础信息的展示
     Promise.allSettled([
       fetchChapters(),
       fetchWares(),

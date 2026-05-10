@@ -88,7 +88,7 @@
             v-for="r in latestResources"
             :key="r.id"
             class="resource-item"
-            @click="$router.push(`/resource/detail/${r.id}`)"
+            @click="$router.push(`/resource/${r.id}`)"
           >
             <div class="resource-cover">
               <img v-if="r.coverUrl" :src="r.coverUrl" :alt="r.title" />

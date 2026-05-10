@@ -94,7 +94,7 @@
             placeholder="请输入验证码"
             :prefix-icon="Key"
             clearable
-            maxlength="6"
+            maxlength="4"
           >
             <template #append>
               <el-button
@@ -252,7 +252,7 @@ const phoneRules: FormRules = {
   ],
   code: [
     { required: true, message: '请输入验证码', trigger: 'blur' },
-    { len: 6, message: '验证码为 6 位数字', trigger: 'blur' },
+    { len: 4, message: '验证码为 4 位数字', trigger: 'blur' },
   ],
 }
 

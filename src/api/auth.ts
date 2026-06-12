@@ -36,6 +36,10 @@ export const getCurrentUser = () =>
 export const updateProfile = (data: UpdateProfileRequest) =>
   put<void>('/v1/auth/profile', data)
 
+/** 获取个人中心统计数据 */
+export const getProfileStats = () =>
+  get<Record<string, number>>('/v1/auth/profile/stats')
+
 /** 修改密码 */
 export const updatePassword = (data: UpdatePasswordRequest) =>
   put<void>('/v1/auth/password', data)

@@ -17,6 +17,8 @@
         >
           <el-button :icon="Upload" :loading="importLoading">批量导入</el-button>
         </el-upload>
+        <!-- 新增用户 -->
+        <el-button type="primary" :icon="Plus" @click="createDialogVisible = true">新增用户</el-button>
         <!-- 导出 -->
         <el-button :icon="Download" :loading="exportLoading" @click="handleExport">
           导出列表
@@ -224,11 +226,13 @@
             </el-tag>
           </div>
         </div>
-        <el-descriptions :column="1" border size="small" class="drawer-desc">
+        <!-- 展示模式 -->
+        <el-descriptions v-if="!isEditing" :column="1" border size="small" class="drawer-desc">
           <el-descriptions-item label="用户名">{{ drawerUser.username }}</el-descriptions-item>
           <el-descriptions-item label="真实姓名">{{ drawerUser.realName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="手机号">{{ drawerUser.phone || '—' }}</el-descriptions-item>
           <el-descriptions-item label="邮箱">{{ drawerUser.email || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="性别">{{ drawerUser.gender === 1 ? '男' : (drawerUser.gender === 2 ? '女' : '未知') }}</el-descriptions-item>
           <el-descriptions-item label="学号/工号">{{ drawerUser.studentNo || '—' }}</el-descriptions-item>
           <el-descriptions-item label="所属学校">{{ drawerUser.schoolName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="院系部门">{{ drawerUser.department || '—' }}</el-descriptions-item>
@@ -240,7 +244,58 @@
           </el-descriptions-item>
           <el-descriptions-item label="注册时间">{{ formatDate(drawerUser.createdTime) }}</el-descriptions-item>
         </el-descriptions>
-        <div class="drawer-actions">
+
+        <!-- 编辑模式 -->
+        <el-form v-else :model="editForm" label-width="90px" size="small">
+          <el-form-item label="用户名">
+            <el-input v-model="editForm.username" />
+          </el-form-item>
+          <el-form-item label="头像">
+            <el-upload
+              class="avatar-uploader"
+              :show-file-list="false"
+              :http-request="customUploadAvatar"
+              accept="image/*"
+            >
+              <img v-if="editForm.avatarUrl" :src="editForm.avatarUrl" class="avatar-preview" />
+              <el-icon v-else class="avatar-uploader-icon"><Plus /></el-icon>
+            </el-upload>
+          </el-form-item>
+          <el-form-item label="真实姓名">
+            <el-input v-model="editForm.realName" />
+          </el-form-item>
+          <el-form-item label="手机号">
+            <el-input v-model="editForm.phone" />
+          </el-form-item>
+          <el-form-item label="邮箱">
+            <el-input v-model="editForm.email" />
+          </el-form-item>
+          <el-form-item label="性别">
+            <el-select v-model="editForm.gender" style="width: 100%" clearable>
+              <el-option label="男" :value="1" />
+              <el-option label="女" :value="2" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="所属学校" v-if="authStore.isAdmin">
+            <el-select v-model="editForm.schoolName" style="width: 100%" clearable>
+              <el-option v-for="s in schoolList" :key="s.id" :label="s.schoolName" :value="s.schoolName" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="学号/工号">
+            <el-input v-model="editForm.studentNo" />
+          </el-form-item>
+          <el-form-item label="院系部门">
+            <el-input v-model="editForm.department" />
+          </el-form-item>
+          <el-form-item label="所在班级">
+            <el-input v-model="editForm.className" />
+          </el-form-item>
+        </el-form>
+
+        <div class="drawer-actions" v-if="!isEditing">
+          <el-button type="primary" plain :icon="Edit" @click="enterEdit">
+            编辑信息
+          </el-button>
           <el-button
             :type="drawerUser.status === 1 ? 'danger' : 'success'"
             plain
@@ -252,21 +307,104 @@
             重置密码
           </el-button>
         </div>
+        <div class="drawer-actions" v-else>
+          <el-button @click="cancelEdit">取消</el-button>
+          <el-button type="primary" :loading="editLoading" @click="saveEdit">保存修改</el-button>
+        </div>
       </div>
     </el-drawer>
+
+    <!-- 新增用户弹窗 -->
+    <el-dialog v-model="createDialogVisible" title="新增用户" width="560px" :close-on-click-modal="false" @closed="resetCreateForm">
+      <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="90px">
+        <el-row :gutter="16">
+          <el-col :span="12">
+            <el-form-item label="用户名" prop="username">
+              <el-input v-model="createForm.username" placeholder="登录账号" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="密码" prop="password">
+              <el-input v-model="createForm.password" placeholder="默认 123456" show-password />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="真实姓名" prop="realName">
+              <el-input v-model="createForm.realName" placeholder="真实姓名" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="手机号" prop="phone">
+              <el-input v-model="createForm.phone" placeholder="手机号" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="角色" prop="roleCode">
+              <el-select v-model="createForm.roleCode" placeholder="选择角色" style="width:100%">
+                <el-option v-for="r in allRoles" :key="r.roleCode" :label="r.roleName" :value="r.roleCode" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="性别">
+              <el-select v-model="createForm.gender" placeholder="性别" style="width:100%" clearable>
+                <el-option label="男" value="男" />
+                <el-option label="女" value="女" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12" v-if="authStore.isAdmin">
+            <el-form-item label="学校名称">
+              <el-select v-model="createForm.schoolName" placeholder="选择学校" style="width:100%" clearable>
+                <el-option v-for="s in schoolList" :key="s.id" :label="s.schoolName" :value="s.schoolName" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="学号/工号">
+              <el-input v-model="createForm.studentNo" placeholder="学号或工号" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="院系">
+              <el-input v-model="createForm.department" placeholder="所属院系" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="班级">
+              <el-input v-model="createForm.className" placeholder="所在班级" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="专业">
+              <el-input v-model="createForm.major" placeholder="所学专业" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="邮箱">
+              <el-input v-model="createForm.email" placeholder="邮箱（选填）" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <template #footer>
+        <el-button @click="createDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="createLoading" @click="handleCreateUser">确认创建</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import type { UploadRawFile } from 'element-plus'
+import type { UploadRawFile, FormInstance } from 'element-plus'
 import {
-  Search, Refresh, Download, Upload, View, Key,
+  Search, Refresh, Download, Upload, View, Key, Plus, Edit,
 } from '@element-plus/icons-vue'
 import {
   getUserList, getUserDetail, updateUserStatus,
-  resetUserPassword, importUsers, getAllRoles, downloadUserTemplate,
+  resetUserPassword, importUsers, getAllRoles, downloadUserTemplate, createUser, updateUserInfo, uploadAvatar,
 } from '@/api/user'
 import { getSchoolList } from '@/api/school'
 import { ROLE_LABEL } from '@/constants'
@@ -279,10 +417,36 @@ const authStore = useAuthStore()
 const loading = ref(false)
 const importLoading = ref(false)
 const exportLoading = ref(false)
+const createLoading = ref(false)
+const createDialogVisible = ref(false)
+const createFormRef = ref<FormInstance>()
 const tableData = ref<(UserManageItem & { _toggling?: boolean })[]>([])
 const total = ref(0)
 const allRoles = ref<{ id: string; roleName: string; roleCode: string }[]>([])
 const schoolList = ref<any[]>([])
+
+// ───── 新增用户表单 ─────
+const createForm = reactive({
+  username: '',
+  password: '',
+  realName: '',
+  phone: '',
+  email: '',
+  gender: '',
+  roleCode: '',
+  studentNo: '',
+  schoolName: '',
+  department: '',
+  className: '',
+  major: '',
+})
+
+const createRules = {
+  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  realName: [{ required: true, message: '请输入真实姓名', trigger: 'blur' }],
+  phone: [{ required: true, message: '请输入手机号', trigger: 'blur' }],
+  roleCode: [{ required: true, message: '请选择角色', trigger: 'change' }],
+}
 
 // ───── 查询参数 ─────
 const query = reactive<UserManageQuery>({
@@ -297,6 +461,78 @@ const query = reactive<UserManageQuery>({
 // ───── 详情抽屉 ─────
 const drawerVisible = ref(false)
 const drawerUser = ref<UserManageItem | null>(null)
+
+// ───── 编辑信息 ─────
+const isEditing = ref(false)
+const editLoading = ref(false)
+const editForm = reactive({
+  username: '',
+  avatarUrl: '',
+  realName: '',
+  phone: '',
+  email: '',
+  gender: undefined as number | undefined,
+  schoolName: '',
+  studentNo: '',
+  department: '',
+  className: '',
+})
+
+function enterEdit() {
+  if (!drawerUser.value) return
+  isEditing.value = true
+  Object.assign(editForm, {
+    username: drawerUser.value.username || '',
+    avatarUrl: drawerUser.value.avatar || '',
+    realName: drawerUser.value.realName || '',
+    phone: drawerUser.value.phone || '',
+    email: drawerUser.value.email || '',
+    gender: drawerUser.value.gender,
+    schoolName: drawerUser.value.schoolName || '',
+    studentNo: drawerUser.value.studentNo || '',
+    department: drawerUser.value.department || '',
+    className: drawerUser.value.className || '',
+  })
+}
+
+function cancelEdit() {
+  isEditing.value = false
+}
+
+async function customUploadAvatar(options: any) {
+  if (!drawerUser.value) return
+  try {
+    const res = await uploadAvatar(options.file, String(drawerUser.value.userId))
+    editForm.avatarUrl = res.url
+    ElMessage.success('头像上传成功')
+  } catch (err: any) {
+    ElMessage.error(err.message || '上传失败')
+  }
+}
+
+async function saveEdit() {
+  if (!drawerUser.value) return
+  await ElMessageBox.confirm('确定要保存修改吗？', '提示', { type: 'warning' }).catch(() => { throw new Error('cancel') })
+  editLoading.value = true
+  try {
+    const payload = { ...editForm }
+    if (payload.gender === '' as any) {
+      payload.gender = undefined
+    }
+    await updateUserInfo(drawerUser.value.userId, payload)
+    ElMessage.success('修改成功')
+    isEditing.value = false
+    // 重新获取详情和列表
+    drawerUser.value = await getUserDetail(drawerUser.value.userId)
+    fetchList()
+  } catch (err: any) {
+    if (err.message !== 'cancel') {
+      console.error(err)
+    }
+  } finally {
+    editLoading.value = false
+  }
+}
 
 // ───── 角色标签颜色 ─────
 function roleTagType(role?: string): 'primary' | 'success' | 'warning' | 'info' | 'danger' {
@@ -392,6 +628,7 @@ async function handleResetPwd(row: UserManageItem) {
 
 // ───── 查看详情 ─────
 async function handleViewDetail(row: UserManageItem) {
+  isEditing.value = false // 重置编辑状态
   drawerUser.value = row
   drawerVisible.value = true
   // 懒加载最新详情
@@ -444,6 +681,31 @@ async function handleImport(file: UploadRawFile) {
     importLoading.value = false
   }
   return false // 阻止自动上传
+}
+
+// ───── 新增单个用户 ─────
+async function handleCreateUser() {
+  if (!createFormRef.value) return
+  const valid = await createFormRef.value.validate().catch(() => false)
+  if (!valid) return
+  createLoading.value = true
+  try {
+    await createUser(createForm)
+    ElMessage.success('用户创建成功！')
+    createDialogVisible.value = false
+    fetchList()
+  } finally {
+    createLoading.value = false
+  }
+}
+
+function resetCreateForm() {
+  createFormRef.value?.resetFields()
+  Object.assign(createForm, {
+    username: '', password: '', realName: '', phone: '', email: '',
+    gender: '', roleCode: '', studentNo: '', schoolName: '',
+    department: '', className: '', major: '',
+  })
 }
 
 // ───── 导出 ─────
@@ -574,4 +836,33 @@ onMounted(async () => {
 .drawer-desc { border-radius: 8px; overflow: hidden; }
 
 .drawer-actions { display: flex; gap: 12px; }
+/* ===== 表单与上传 ===== */
+:deep(.avatar-uploader .el-upload) {
+  border: 1px dashed var(--el-border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: var(--el-transition-duration-fast);
+}
+
+:deep(.avatar-uploader .el-upload:hover) {
+  border-color: var(--el-color-primary);
+}
+
+.avatar-uploader-icon {
+  font-size: 28px;
+  color: #8c939d;
+  width: 78px;
+  height: 78px;
+  text-align: center;
+}
+
+.avatar-preview {
+  width: 78px;
+  height: 78px;
+  display: block;
+  object-fit: cover;
+}
+
 </style>

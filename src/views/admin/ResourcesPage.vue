@@ -5,6 +5,17 @@
         <h2 class="page-title">资源管理</h2>
         <p class="page-desc">全站资源库内容预览、查看详情与违规下架管理</p>
       </div>
+      <div class="header-actions" v-if="authStore.isAdmin">
+        <el-button :icon="Download" @click="handleDownloadTemplate">下载模板</el-button>
+        <el-upload
+          :show-file-list="false"
+          :before-upload="handleImport"
+          accept=".xlsx,.xls"
+          class="import-upload"
+        >
+          <el-button type="primary" :icon="Upload" :loading="importLoading">批量导入</el-button>
+        </el-upload>
+      </div>
     </div>
 
     <!-- 筛选 -->
@@ -82,12 +93,15 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search } from '@element-plus/icons-vue'
+import type { UploadRawFile } from 'element-plus'
+import { Search, Download, Upload } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
-import { getResourceList, offlineResource, onlineResource } from '@/api/resource'
+import { getResourceList, offlineResource, onlineResource, downloadResourceTemplate, importResources } from '@/api/resource'
 import type { ResourceItem } from '@/api/resource'
+import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 // 默认查询全量资源（管理后台视角）
 const query = reactive({
@@ -98,6 +112,7 @@ const query = reactive({
 })
 
 const loading = ref(false)
+const importLoading = ref(false)
 const resources = ref<ResourceItem[]>([])
 const total = ref(0)
 
@@ -145,6 +160,49 @@ async function handleOnline(row: ResourceItem) {
   }
 }
 
+// ───── 下载模板 ─────
+async function handleDownloadTemplate() {
+  try {
+    const blob = await downloadResourceTemplate()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = '资源导入模板.xlsx'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+  } catch (err) {
+    console.error('下载模板失败', err)
+  }
+}
+
+// ───── 批量导入 ─────
+async function handleImport(file: UploadRawFile) {
+  if (!/\.(xlsx|xls)$/i.test(file.name)) {
+    ElMessage.error('请上传 Excel 文件（.xlsx 或 .xls）')
+    return false
+  }
+  importLoading.value = true
+  try {
+    const res = await importResources(file)
+    const msg = `导入完成：成功 ${res.successCount} 条，失败 ${res.failCount} 条`
+    if (res.failCount > 0) {
+      ElMessageBox.alert(
+        `${msg}<br/><br/>失败明细：<br/>${res.failDetails.join('<br/>')}`,
+        '导入结果',
+        { dangerouslyUseHTMLString: true, type: 'warning' }
+      )
+    } else {
+      ElMessage.success(msg)
+    }
+    fetchResources()
+  } finally {
+    importLoading.value = false
+  }
+  return false // 阻止自动上传
+}
+
 onMounted(fetchResources)
 </script>
 
@@ -160,4 +218,6 @@ onMounted(fetchResources)
   background: linear-gradient(135deg, #ff5252, #d32f2f) !important;
   border: none !important; border-radius: 8px !important; color: #fff !important;
 }
+.header-actions { display: flex; gap: 10px; align-items: center; }
+.import-upload { display: inline-block; }
 </style>

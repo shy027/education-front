@@ -245,7 +245,7 @@ import {
   InfoFilled,
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
-import { updateProfile, updatePassword } from '@/api/auth'
+import { updateProfile, updatePassword, getProfileStats } from '@/api/auth'
 import { uploadAvatar } from '@/api/user'
 import type { UpdateProfileRequest, UpdatePasswordRequest } from '@/types/user'
 
@@ -279,29 +279,31 @@ const navItems = [
   { key: 'security', label: '账号安全', icon: markRaw(Lock) },
 ] as const
 
-// ───── 统计（静态占位，后续可接 API） ─────
+// ───── 统计（接入后端动态数据） ─────
+const statsData = ref<Record<string, number>>({})
+
 const statItems = computed(() => {
   if (authStore.isTeacher) {
     return [
-      { label: '在授课程', value: '—' },
-      { label: '学生数量', value: '—' },
-      { label: '发布任务', value: '—' },
-      { label: '研讨主题', value: '—' },
+      { label: '在授课程', value: statsData.value.courseCount || 0 },
+      { label: '学生数量', value: statsData.value.studentCount || 0 },
+      { label: '发布任务', value: statsData.value.taskCount || 0 },
+      { label: '研讨主题', value: statsData.value.topicCount || 0 },
     ]
   }
   if (authStore.isAdmin || authStore.isSchoolLeader) {
     return [
-      { label: '管理学校', value: '—' },
-      { label: '待办审批', value: '—' },
-      { label: '资源总数', value: '—' },
-      { label: '平台用户', value: '—' },
+      { label: '管理学校', value: statsData.value.schoolCount || 0 },
+      { label: '待办审批', value: statsData.value.auditCount || 0 },
+      { label: '资源总数', value: statsData.value.resourceCount || 0 },
+      { label: '平台用户', value: statsData.value.userCount || 0 },
     ]
   }
   return [
-    { label: '加入课程', value: '—' },
-    { label: '完成作业', value: '—' },
-    { label: '参与讨论', value: '—' },
-    { label: '学习时长', value: '—' },
+    { label: '加入课程', value: statsData.value.joinedCourseCount || 0 },
+    { label: '完成作业', value: statsData.value.finishedHomeworkCount || 0 },
+    { label: '参与讨论', value: statsData.value.discussionCount || 0 },
+    { label: '学习时长(h)', value: statsData.value.studyHours || 0 },
   ]
 })
 
@@ -444,8 +446,14 @@ onMounted(async () => {
   try {
     await authStore.fetchCurrentUser()
     resetProfileForm()
+    
+    // 获取统计数据
+    const statsRes = await getProfileStats()
+    if (statsRes) {
+      statsData.value = statsRes
+    }
   } catch (err) {
-    console.error('Failed to fetch user info:', err)
+    console.error('Failed to fetch user info or stats:', err)
   }
 })
 

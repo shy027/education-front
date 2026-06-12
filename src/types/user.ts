@@ -115,4 +115,5 @@ export interface RegisterRequest {
   password: string
   phone?: string
   email?: string
+  roleCode?: string
 }

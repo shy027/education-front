@@ -141,6 +141,12 @@
         size="large"
         class="auth-form"
       >
+        <el-form-item prop="roleCode">
+          <el-radio-group v-model="regForm.roleCode">
+            <el-radio value="STUDENT">学生</el-radio>
+            <el-radio value="TEACHER">教师</el-radio>
+          </el-radio-group>
+        </el-form-item>
         <el-form-item prop="username">
           <el-input
             v-model="regForm.username"
@@ -237,7 +243,7 @@ const reg2FormRef = ref<FormInstance>()
 // ───── 表单数据 ─────
 const accountForm = reactive({ username: '', password: '' })
 const phoneForm = reactive({ phone: '', code: '' })
-const regForm = reactive({ username: '', password: '', phone: '', email: '' })
+const regForm = reactive({ username: '', password: '', phone: '', email: '', roleCode: 'STUDENT' })
 
 // ───── 校验规则 ─────
 const accountRules: FormRules = {
@@ -266,6 +272,7 @@ const reg1Rules: FormRules = {
     { min: 6, max: 32, message: '密码至少 6 位', trigger: 'blur' },
   ],
   phone: [{ pattern: /^(1[3-9]\d{9})?$/, message: '手机号格式不正确', trigger: 'blur' }],
+  roleCode: [{ required: true, message: '请选择身份', trigger: 'change' }],
 }
 
 const reg2Rules: FormRules = {
@@ -345,10 +352,11 @@ async function handleRegister() {
       password: regForm.password,
       phone: regForm.phone || undefined,
       email: regForm.email || undefined,
+      roleCode: regForm.roleCode,
     })
     ElMessage.success('注册成功，请登录')
     // 重置注册状态
-    Object.assign(regForm, { username: '', password: '', phone: '', email: '' })
+    Object.assign(regForm, { username: '', password: '', phone: '', email: '', roleCode: 'STUDENT' })
     regStep.value = 1
     activeTab.value = 'login'
     accountForm.username = regForm.username

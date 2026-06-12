@@ -14,6 +14,10 @@ export const getUserDetail = (userId: string) =>
 export const updateUserStatus = (userId: string, status: number) =>
   put<void>(`/v1/users/manage/${userId}/status`, { status })
 
+/** 更新用户信息 */
+export const updateUserInfo = (userId: string, data: any) =>
+  put<void>(`/v1/users/manage/${userId}`, data)
+
 /** 重置用户密码 */
 export const resetUserPassword = (userId: string) =>
   post<{ newPassword: string; message: string }>(`/v1/users/manage/${userId}/reset-password`)
@@ -55,3 +59,20 @@ export const getAllRoles = () =>
 /** 下载用户导入模板 */
 export const downloadUserTemplate = () =>
   get<Blob>('/v1/users/manage/template', {}, { responseType: 'blob' })
+
+/** 单独新增一个用户（表单方式） */
+export const createUser = (data: {
+  username: string
+  password?: string
+  realName: string
+  phone: string
+  email?: string
+  gender?: string
+  roleCode: string
+  studentNo?: string
+  schoolName?: string
+  department?: string
+  className?: string
+  major?: string
+}) => post<void>('/v1/users/manage/create', data)
+

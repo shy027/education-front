@@ -173,3 +173,16 @@ export const uploadResourceAudio = (file: File) => {
   form.append('file', file)
   return upload<{ fileUrl: string; fileName: string; fileSize: number }>('/v1/upload/audio', form)
 }
+
+// ===================== 批量导入 =====================
+
+/** 下载资源导入模板 */
+export const downloadResourceTemplate = () =>
+  get<Blob>('/v1/resources/admin/template', {}, { responseType: 'blob' })
+
+/** 批量导入资源 */
+export const importResources = (file: File) => {
+  const form = new FormData()
+  form.append('file', file)
+  return upload<{ successCount: number; failCount: number; failDetails: string[] }>('/v1/resources/admin/import', form)
+}
